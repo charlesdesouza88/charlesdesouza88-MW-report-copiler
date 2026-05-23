@@ -46,16 +46,32 @@ mister-wiz-report-compiler/
 
 ## How to run
 
+CLI report generation:
+
 ```bash
+python -m venv .venv
+. .venv/bin/activate
 pip install -r requirements.txt
 python compiler.py
-# → output/ now contains all student reports and class diagnostics
+# -> output/ now contains all student reports and class diagnostics
 ```
 
-To run tests:
+Web dashboard:
 
 ```bash
-pytest test_compiler.py -v
+python -m venv .venv
+. .venv/bin/activate
+pip install -r requirements.txt
+cp .env.example .env
+python app.py
+# -> open http://127.0.0.1:5000
+```
+
+To run the test battery:
+
+```bash
+. .venv/bin/activate
+pytest -q
 ```
 
 ---
@@ -189,6 +205,34 @@ No code changes needed.
 | `group_by_turma(students)` | Groups student list into `{turma: [students]}` dict |
 
 ---
+
+## Go live on Vercel
+
+This repository is configured for Vercel with:
+
+- `api/index.py` (Vercel Python function entrypoint)
+- `vercel.json` (rewrites all routes to the Flask app entrypoint)
+
+Deploy steps:
+
+1. Push this branch to GitHub.
+2. In Vercel, import the repository as a new project.
+3. Set environment variables:
+  - `ADMIN_PASSWORD` (required)
+  - `SECRET_KEY` (required)
+4. Deploy. Vercel automatically assigns a public domain like `https://<project>.vercel.app`.
+
+Notes:
+
+- On Vercel, the app defaults `DATA_DIR` and `OUT_DIR` to `/tmp/mw/data` and `/tmp/mw/output`.
+- `/tmp` is writable but ephemeral in serverless environments, so uploaded CSVs and generated reports are temporary.
+- For persistent storage, use external storage (for example, Vercel Blob, S3, or a database-backed approach).
+
+Recommended post-deploy checks:
+
+1. Log in at `/login` with `ADMIN_PASSWORD`.
+2. Upload both CSV files from the Upload page.
+3. Generate reports and confirm preview/download routes work.
 
 ## Planned extensions
 

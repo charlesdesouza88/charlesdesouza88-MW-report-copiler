@@ -2,3 +2,5 @@ output/*.html
 __pycache__/
 *.pyc
 .env
+.venv/
+.vscode/

@@ -15,16 +15,43 @@ from jinja2 import Environment, FileSystemLoader
 from compiler import (generate_class_diagnostics, generate_individual_reports,
                       group_by_turma, load_csv)
 
+BASE = Path(__file__).parent
+
+
+def _load_local_env():
+    env_path = BASE / '.env'
+    if not env_path.exists():
+        return
+    for raw_line in env_path.read_text(encoding='utf-8').splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith('#'):
+            continue
+        if line.startswith('export '):
+            line = line[7:].strip()
+        if '=' not in line:
+            continue
+        key, value = line.split('=', 1)
+        os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
+
+
+_load_local_env()
+
+if os.environ.get('VERCEL'):
+    default_data_dir = '/tmp/mw/data'
+    default_out_dir = '/tmp/mw/output'
+else:
+    default_data_dir = str(BASE / 'data')
+    default_out_dir = str(BASE / 'output')
+
+DATA_DIR = Path(os.environ.get('DATA_DIR', default_data_dir))
+TMPL_DIR = BASE / 'templates'
+OUT_DIR = Path(os.environ.get('OUT_DIR', default_out_dir))
+OUT_DIR.mkdir(parents=True, exist_ok=True)
+DATA_DIR.mkdir(parents=True, exist_ok=True)
+
 app = Flask(__name__, template_folder='web_templates')
 app.secret_key = os.environ.get('SECRET_KEY', 'mw-dev-change-in-prod')
 ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', 'admin')
-
-BASE = Path(__file__).parent
-DATA_DIR = BASE / 'data'
-TMPL_DIR = BASE / 'templates'
-OUT_DIR = BASE / 'output'
-OUT_DIR.mkdir(exist_ok=True)
-DATA_DIR.mkdir(exist_ok=True)
 
 STUDENT_FIELDS = [
     'teacher', 'turma', 'turma_display', 'nivel', 'horario', 'student_name',
@@ -234,4 +261,6 @@ def download_all():
 
 
 if __name__ == '__main__':
-    app.run(debug=True, port=5000)
+    debug = os.environ.get('FLASK_DEBUG', '').lower() in ('1', 'true', 'yes')
+    port = int(os.environ.get('PORT', '5000'))
+    app.run(debug=debug, host='0.0.0.0', port=port)
