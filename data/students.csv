@@ -1,0 +1,26 @@
+teacher,turma,turma_display,nivel,horario,student_name,participacao,comportamento,speaking,listening,foco,writing,reading,gramatica,trabalho_equipe,organizacao,pontualidade,respeito_regras,faltas,missed_aulas,aula_extra,feedback_participacao,feedback_foco,feedback_trabalho_equipe,recomendacoes,observacao
+Chuck,MASTER,Masters,Adults Book 4,"Terça e quinta, 19:00 - 20:00",Bruna Vieira Matias,4,4,5,3,5,4,4,4,4,4,4,4,0,,,"Acerta acima de 80%","Muito interessada","Sempre muito bem",,Self-learned
+Chuck,MASTER,Masters,Adults Book 4,"Terça e quinta, 19:00 - 20:00",Guilherme Soares de Oliveira,3,3,5,3,4,5,3,3,3,3,3,4,0,,,Contribui quando solicitado,Foco oscila às vezes,"Colabora bem em grupo","Aulas extras a cada 15 dias na turma 3",Baixo engajamento
+Chuck,MASTER,Masters,Adults Book 4,"Terça e quinta, 19:00 - 20:00",Jaqueline Lourdes Tomaz Rodrigues,3,3,5,3,4,3,3,3,3,3,4,4,0,,,Participa regularmente,Focada na maior parte do tempo,Trabalha bem com colegas,,
+Chuck,MASTER,Masters,Adults Book 4,"Terça e quinta, 19:00 - 20:00",Luis Fernando Schettini Sousa Barros,4,3,5,3,5,4,4,5,4,3,4,4,0,,,Excelente contribuição oral,Muito focado e atento,"Lidera e engaja a turma",,Seguro
+Chuck,MASTER,Masters,Adults Book 4,"Terça e quinta, 19:00 - 20:00",Maria Beatriz Jati Pena,3,3,5,4,4,4,3,4,3,4,5,5,0,,,Participa com qualidade,Atenção excelente,"Colabora muito bem",,Quick-learned
+Chuck,MASTER,Masters,Adults Book 4,"Terça e quinta, 19:00 - 20:00",Mellissa Kelly Oliveira Batista,3,3,5,3,4,4,3,3,3,3,3,3,0,,Reforço,"Contribui quando solicitado","Às vezes perde o foco","Participa bem em equipe","3 aulas mensais na turma 3",Disponibilidade
+Chuck,MASTER,Masters,Adults Book 4,"Terça e quinta, 19:00 - 20:00",Pedro Henrique Gonçalves Batista,5,4,5,4,4,4,4,4,5,4,5,5,0,,,Contribuição exemplar,Sempre atento e focado,"Trabalho em equipe exemplar",,Self-learned
+Chuck,INSPIRE,Inspire,Teens 1,"Terça e quinta, 18:00 - 19:30",Davi Elisiário Genelhu Penna,4,4,5,4,3,4,3,3,4,4,4,4,0,,,Boa contribuição oral,Geralmente focado,Trabalha bem com colegas,,Great student
+Chuck,INSPIRE,Inspire,Teens 1,"Terça e quinta, 18:00 - 19:30",Felipe Garcia Guimarães,4,5,4,3,3,3,3,3,4,4,5,4,0,,Reforço,Contribui bastante,Às vezes se distrai,Engajado com o grupo,"Reforço de gramática necessário",Good student
+Chuck,INSPIRE,Inspire,Teens 1,"Terça e quinta, 18:00 - 19:30",Francisco Seppe Assis Costa,4,4,5,4,4,4,3,3,4,4,4,4,2,,"","Boa participação","Foco consistente","Colabora com a turma",,misses classes
+Chuck,INSPIRE,Inspire,Teens 1,"Terça e quinta, 18:00 - 19:30",Theo Elisiario Genelhu Penna,4,5,5,4,3,3,3,3,4,4,5,5,0,,,Muito participativo,Bom foco em geral,Excelente trabalho em equipe,,Great student
+Chuck,INSPIRE,Inspire,Teens 1,"Terça e quinta, 18:00 - 19:30",Miguel Machado Barbosa,3,3,3,3,3,3,3,3,3,3,3,3,0,,Reposição,Participa regularmente,Foco adequado,Colaborativo com colegas,,Great development
+Chuck,POWER,Power,Teens 2,"Segunda e quarta, 14:00 - 15:30",Heitor José Ferreira Rosa,4,4,4,4,4,3,3,3,4,4,4,4,0,,,Boa contribuição oral,Focado e atento,Bom trabalho em equipe,,Very smart
+Chuck,POWER,Power,Teens 2,"Segunda e quarta, 14:00 - 15:30",Isaac Antônio Pires de Souza,4,5,5,4,5,4,3,3,4,4,5,5,1,,,Participação exemplar,Sempre focado,"Ótimo trabalho em equipe",,Very good student
+Chuck,POWER,Power,Teens 2,"Segunda e quarta, 14:00 - 15:30",Isadora Luiza de Brito Silva,5,5,5,4,5,5,4,4,5,4,5,5,0,,,Contribuição excelente,Atenção impecável,Trabalha com excelência,,Great student
+Chuck,POWER,Power,Teens 2,"Segunda e quarta, 14:00 - 15:30",Kaio Cézar Oliveira Vieira,2,2,4,3,3,3,2,2,2,2,2,3,2,,Reforço,Contribui pouco,Precisa de mais foco,Precisa engajar mais,,Shy
+Chuck,POWER,Power,Teens 2,"Segunda e quarta, 14:00 - 15:30",Maria Clara Caetano Dornelas,3,4,5,4,5,4,3,3,3,4,4,4,0,,,Precisa participar mais,Atenção excelente,Boa colaboração,,Great student
+Chuck,POWER,Power,Teens 2,"Segunda e quarta, 14:00 - 15:30",Murilo Menezes de Cardoso,3,4,4,3,3,4,4,3,3,4,4,4,0,,,Pode participar mais,Foco bom,Muito organizado,,Good student
+Chuck,SPARK,Spark,Kids 1,"Segunda e quarta, 8:00 - 9:30",Bernardo de Oliveira Santos,5,5,5,4,4,4,3,3,5,4,5,5,0,,,Contribui com entusiasmo,Sempre focado,Lidera os colegas,,Well behaved
+Chuck,SPARK,Spark,Kids 1,"Segunda e quarta, 8:00 - 9:30",Miguel Paiva Pacheco,3,3,4,3,3,3,3,2,3,3,3,3,1,,Reforço,Contribui às vezes,Dificuldade de foco,Colabora quando guiado,,Needs help
+Chuck,SPARK,Spark,Kids 1,"Segunda e quarta, 8:00 - 9:30",Pedro Alcantara Grigorevski,4,3,4,3,3,4,2,2,3,3,3,4,2,,,"Boa participação oral","Foco oscila",Trabalha bem em grupo,,Needs development help
+Chuck,BEYOND,Beyond,Adults 4,"Segunda e quarta, 19:00 - 20:00",Emanuelli Sofia Fonseca Moreira,3,3,4,3,4,3,3,3,3,3,3,3,0,,,Contribui quando solicitado,Foco adequado,Colabora bem,,
+Chuck,BEYOND,Beyond,Adults 4,"Segunda e quarta, 19:00 - 20:00",Laura Campos Marino,4,4,4,4,4,4,3,3,4,4,4,4,0,,,Boa contribuição oral,Muito focada,Excelente trabalho em equipe,,
+Chuck,BEYOND,Beyond,Adults 4,"Segunda e quarta, 19:00 - 20:00",Sara Dutra Rocha,5,4,5,4,4,4,3,3,5,4,5,5,0,,,Contribuição exemplar,Atenção excelente,Trabalha muito bem,,
+Chuck,BEYOND,Beyond,Adults 4,"Segunda e quarta, 19:00 - 20:00",Synay Raquel Mancor Rodrigues,4,4,5,3,4,4,3,3,4,3,4,4,0,,,Boa participação,Focada na maior parte,Colabora bem,,
