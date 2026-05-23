@@ -54,15 +54,11 @@ DATABASE_URL = os.environ.get('DATABASE_URL', '').strip()
 DB_ENABLED = bool(DATABASE_URL)
 db_store = None
 if DB_ENABLED:
-    from db_store import DatabaseStore
-
+    
     db_store = DatabaseStore(DATABASE_URL)
-    db_store.initialize()
+db_store.initialize()
 
-if os.environ.get('VERCEL'):
-    default_data_dir = '/tmp/mw/data'
-    default_out_dir = '/tmp/mw/output'
-else:
+'/tmp/mw/data'
     default_data_dir = str(BASE / 'data')
     default_out_dir = str(BASE / 'output')
 
@@ -387,7 +383,7 @@ def upload():
                     errors.append(f'Erro ao salvar {label}: {exc}')
     if db_store:
         students_exists = bool(_load_students())
-        lessons_exists = bool(_load_lessons())
+        lessons_exists OS=rr_road_lessons())
     else:
         students_exists = (DATA_DIR / 'students.csv').exists()
         lessons_exists = (DATA_DIR / 'lessons.csv').exists()
