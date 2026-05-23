@@ -131,7 +131,10 @@ def group_by_turma(students):
 def build_student_ctx(s, all_lessons):
     turma_lessons = lessons_for(s["turma"], all_lessons)
     total = len(turma_lessons)
-    faltas = int_score(s.get("faltas", 0), default=0)
+    try:
+        faltas = max(0, int(float(s.get("faltas") or 0)))
+    except (TypeError, ValueError):
+        faltas = 0
 
     pct = presence_pct(faltas, total)
     pie_d, full_circle = pie_path(pct)
