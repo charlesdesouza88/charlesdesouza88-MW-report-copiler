@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>{{ turma_display }} — Diagnóstico de Turma</title>
+<style>
+@page { size: A4 landscape; margin: 8mm; }
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: Arial, Helvetica, sans-serif;
+  background: #fff;
+  color: #111;
+  font-size: 10px;
+  width: 277mm;
+}
+.page-break { page-break-before: always; }
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  border-bottom: 2px solid #5B2D8E;
+  padding-bottom: 4px;
+}
+.logo-mister { font-size: 14px; font-weight: 900; }
+.logo-wiz { font-size: 18px; font-weight: 900; }
+.logo-wiz .star { color: #5B2D8E; }
+.header-center { text-align: center; }
+.class-name { font-size: 20px; font-weight: 900; }
+.class-sub { font-size: 10px; color: #555; }
+.teacher-block { text-align: right; font-size: 10px; }
+.teacher-label { color: #5B2D8E; font-weight: 700; }
+.teacher-name { font-size: 16px; font-weight: 900; color: #5B2D8E; }
+
+.section-title {
+  font-size: 14px;
+  font-weight: 900;
+  border-left: 4px solid #5B2D8E;
+  padding-left: 6px;
+  margin-bottom: 6px;
+}
+
+.profile-table { width: 100%; border-collapse: collapse; margin-bottom: 14px; }
+.profile-table th {
+  background: #5B2D8E;
+  color: white;
+  padding: 4px 8px;
+  text-align: left;
+  font-size: 10px;
+}
+.profile-table td { border: 1px solid #DDD; padding: 4px 8px; font-size: 10px; vertical-align: top; }
+.profile-table tr:nth-child(even) td { background: #F5EEF8; }
+.tag { display: inline-block; background: #5B2D8E; color: white; border-radius: 10px; padding: 1px 7px; font-size: 8.5px; font-weight: 700; }
+
+.skill-cards { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+.skill-card {
+  border: 2px solid #5B2D8E;
+  border-radius: 8px;
+  padding: 8px;
+  width: 155px;
+  flex-shrink: 0;
+}
+.skill-card-name { font-size: 11px; font-weight: 900; margin-bottom: 4px; color: #5B2D8E; }
+.skill-scores { display: flex; gap: 4px; margin-bottom: 6px; }
+.skill-score-item { text-align: center; flex: 1; }
+.skill-bubble {
+  width: 26px; height: 26px; border-radius: 50%;
+  background: #5B2D8E; color: white;
+  font-size: 14px; font-weight: 900;
+  display: flex; align-items: center; justify-content: center;
+  margin: 0 auto;
+}
+.skill-score-label { font-size: 7px; font-weight: 700; margin-top: 2px; }
+.mini-radar { display: flex; justify-content: center; }
+
+.dev-table { width: 100%; border-collapse: collapse; margin-bottom: 10px; }
+.dev-table th {
+  background: #5B2D8E; color: white;
+  padding: 4px 10px;
+  font-size: 10px; text-align: center;
+}
+.dev-table td { border: 1px solid #DDD; padding: 4px 10px; font-size: 10px; text-align: center; vertical-align: middle; }
+.dev-table td:first-child { text-align: left; }
+.dev-table tr:nth-child(even) td { background: #F5EEF8; }
+.score-circle {
+  width: 24px; height: 24px; border-radius: 50%;
+  background: #5B2D8E; color: white;
+  font-size: 13px; font-weight: 900;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.dev-scale { font-size: 9px; color: #555; margin-top: 6px; margin-bottom: 14px; }
+
+.reinforcement { margin-bottom: 14px; }
+.reinf-item { margin-bottom: 6px; }
+.reinf-name { font-weight: 900; font-size: 11px; color: #5B2D8E; }
+.reinf-text { font-size: 10px; }
+
+.student-page { margin-top: 0; }
+.student-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 2px solid #5B2D8E;
+  padding-bottom: 4px;
+  margin-bottom: 10px;
+}
+.student-page-name { font-size: 22px; font-weight: 900; }
+.criteria-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 12px; }
+.crit-card { border: 2px solid #5B2D8E; border-radius: 8px; padding: 8px; }
+.crit-title { font-size: 11px; font-weight: 900; color: #5B2D8E; margin-bottom: 4px; }
+.crit-score { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
+.crit-bubble {
+  width: 34px; height: 34px; border-radius: 50%;
+  background: #5B2D8E; color: white;
+  font-size: 20px; font-weight: 900;
+  display: flex; align-items: center; justify-content: center;
+}
+.crit-scale { font-size: 8px; color: #555; line-height: 1.4; }
+.dates-section { margin-bottom: 12px; }
+.dates-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+.dates-card { border: 1px solid #BBB; border-radius: 6px; padding: 6px; }
+.dates-card-title { font-size: 10px; font-weight: 700; text-align: center; border-bottom: 1px solid #DDD; margin-bottom: 4px; padding-bottom: 3px; }
+.date-slot { border: 1px solid #CCC; padding: 3px 6px; font-size: 9px; text-align: center; margin-bottom: 3px; color: #999; }
+.extra-notes { border: 2px solid #5B2D8E; border-radius: 8px; padding: 8px; font-size: 10px; }
+.extra-notes-title { font-weight: 700; color: #5B2D8E; margin-bottom: 3px; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="logo">
+    <div class="logo-mister">MISTER</div>
+    <div class="logo-wiz">W<span class="star">✦</span>Z</div>
+  </div>
+  <div class="header-center">
+    <div class="class-name">{{ turma_display }} — {{ nivel }}</div>
+    <div class="class-sub">{{ horario }}</div>
+  </div>
+  <div class="teacher-block">
+    <div class="teacher-label">Teacher</div>
+    <div class="teacher-name">{{ teacher }}</div>
+  </div>
+</div>
+
+<div class="section-title">Membros da Turma</div>
+<table class="profile-table">
+  <thead>
+    <tr>
+      <th>Nome</th>
+      <th>Perfil Natural</th>
+      <th>Ponto de Atenção</th>
+      <th>Observação</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for sd in students %}
+    <tr>
+      <td><strong>{{ sd.student.student_name }}</strong></td>
+      <td>{{ sd.student.observacao or '—' }}</td>
+      <td>
+        {% if sd.student.aula_extra %}
+        <span class="tag">{{ sd.student.aula_extra }}</span>
+        {% else %}—{% endif %}
+      </td>
+      <td>{{ sd.student.recomendacoes or '—' }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<div class="section-title">Habilidades por Aluno</div>
+<div class="skill-cards">
+  {% for sd in students %}
+  <div class="skill-card">
+    <div class="skill-card-name">{{ sd.student.student_name.split()[0] }} {{ sd.student.student_name.split()[-1] }}</div>
+    <div class="skill-scores">
+      <div class="skill-score-item">
+        <div class="skill-bubble">{{ sd.dev_scores[1] }}</div>
+        <div class="skill-score-label">Fala</div>
+      </div>
+      <div class="skill-score-item">
+        <div class="skill-bubble">{{ sd.dev_scores[0] }}</div>
+        <div class="skill-score-label">Audição</div>
+      </div>
+      <div class="skill-score-item">
+        <div class="skill-bubble">{{ sd.dev_scores[3] }}</div>
+        <div class="skill-score-label">Escrita</div>
+      </div>
+      <div class="skill-score-item">
+        <div class="skill-bubble">{{ sd.dev_scores[4] }}</div>
+        <div class="skill-score-label">Leitura</div>
+      </div>
+      <div class="skill-score-item">
+        <div class="skill-bubble">{{ sd.dev_scores[2] }}</div>
+        <div class="skill-score-label">Gramática</div>
+      </div>
+    </div>
+    <div class="mini-radar">
+      <svg width="90" height="90" viewBox="-5 5 210 205" font-family="Arial">
+        {% for ring in grid %}
+        <polygon points="{{ ring }}" fill="none" stroke="#EEE" stroke-width="1.5"/>
+        {% endfor %}
+        {% for ep in axes %}
+        <line x1="100" y1="105" x2="{{ ep[0] }}" y2="{{ ep[1] }}" stroke="#EEE" stroke-width="1"/>
+        {% endfor %}
+        <polygon points="{{ sd.pentagon }}" fill="rgba(91,45,142,0.25)" stroke="#5B2D8E" stroke-width="2.5"/>
+      </svg>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<div class="page-break"></div>
+
+<div class="header">
+  <div class="logo">
+    <div class="logo-mister">MISTER</div>
+    <div class="logo-wiz">W<span class="star">✦</span>Z</div>
+  </div>
+  <div class="header-center">
+    <div class="class-name">{{ turma_display }} — {{ nivel }}</div>
+    <div class="class-sub">{{ horario }}</div>
+  </div>
+  <div class="teacher-block">
+    <div class="teacher-label">Teacher</div>
+    <div class="teacher-name">{{ teacher }}</div>
+  </div>
+</div>
+
+<div class="section-title">Índices de Desenvolvimento</div>
+<table class="dev-table">
+  <thead>
+    <tr>
+      <th style="text-align:left">Aluno</th>
+      <th>Presença</th>
+      <th>Desenvolvimento</th>
+      <th>Engajamento</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for sd in students %}
+    <tr>
+      <td><strong>{{ sd.student.student_name }}</strong></td>
+      <td><span class="score-circle">{{ sd.pres_score }}</span></td>
+      <td><span class="score-circle">{{ sd.dev_overall }}</span></td>
+      <td><span class="score-circle">{{ sd.part_overall }}</span></td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+<div class="dev-scale">Escala: <strong>1</strong> Baixo &nbsp;|&nbsp; <strong>3</strong> Médio &nbsp;|&nbsp; <strong>5</strong> Alto</div>
+
+{% set extra_students = students | selectattr('student.aula_extra') | list %}
+{% if extra_students %}
+<div class="section-title">Direcionamento de Reforço</div>
+<div class="reinforcement">
+  {% for sd in extra_students %}
+  <div class="reinf-item">
+    <div class="reinf-name">{{ sd.student.student_name.split()[0] }}: <span class="tag">{{ sd.student.aula_extra }}</span></div>
+    <div class="reinf-text">{{ sd.student.recomendacoes or sd.student.observacao or '—' }}</div>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+{% for sd in students %}
+{% if sd.student.aula_extra %}
+<div class="page-break"></div>
+<div class="student-page">
+
+  <div class="student-header">
+    <div class="logo">
+      <div class="logo-mister">MISTER</div>
+      <div class="logo-wiz">W<span class="star">✦</span>Z</div>
+    </div>
+    <div class="student-page-name">{{ sd.student.student_name }}</div>
+    <div class="teacher-block">
+      <div class="teacher-label">Teacher</div>
+      <div class="teacher-name">{{ teacher }}</div>
+      <div style="font-size:9px;color:#555">{{ horario }}</div>
+    </div>
+  </div>
+
+  <div class="criteria-grid">
+    <div class="crit-card">
+      <div class="crit-title">Comunicação</div>
+      <div class="crit-score">
+        <div class="crit-bubble">{{ sd.part_scores[0] }}</div>
+        <div class="crit-scale">
+          1. Não sustenta um diálogo<br>
+          2. Dificuldade para desenvolver ideias<br>
+          3. Consegue argumentar<br>
+          4. Desenvolve raciocínio com fluidez<br>
+          5. Argumenta com naturalidade
+        </div>
+      </div>
+    </div>
+    <div class="crit-card">
+      <div class="crit-title">Expressão escrita</div>
+      <div class="crit-score">
+        <div class="crit-bubble">{{ sd.dev_scores[3] }}</div>
+        <div class="crit-scale">
+          1. Dificuldade de interpretação<br>
+          2. Entende apenas o sentido geral<br>
+          3. Compreende e interpreta<br>
+          4. Analisa estrutura e vocabulário<br>
+          5. Leitura crítica aprofundada
+        </div>
+      </div>
+    </div>
+    <div class="crit-card">
+      <div class="crit-title">Domínio Estrutural</div>
+      <div class="crit-score">
+        <div class="crit-bubble">{{ sd.dev_scores[2] }}</div>
+        <div class="crit-scale">
+          1. Falhas frequentes no uso de estruturas<br>
+          2. Erros recorrentes em construções<br>
+          3. Apenas desvios que não comprometem<br>
+          4. Aplica estruturas complexas<br>
+          5. Utiliza estruturas avançadas
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="dates-section">
+    <div class="section-title" style="margin-bottom:6px">Agenda de Reposições e Reforços</div>
+    <div class="dates-grid">
+      <div class="dates-card">
+        <div class="dates-card-title">Reposições</div>
+        <div class="date-slot">____/____</div>
+        <div class="date-slot">____/____</div>
+        <div class="date-slot">____/____</div>
+      </div>
+      <div class="dates-card">
+        <div class="dates-card-title">Reforço</div>
+        <div class="date-slot">____/____</div>
+        <div class="date-slot">____/____</div>
+        <div class="date-slot">____/____</div>
+      </div>
+      <div class="dates-card">
+        <div class="dates-card-title">Aula extra</div>
+        <div class="date-slot">____/____</div>
+        <div class="date-slot">____/____</div>
+        <div class="date-slot">____/____</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="extra-notes">
+    <div class="extra-notes-title">Material extra e Reforço:</div>
+    {{ sd.student.recomendacoes or sd.student.observacao or '' }}
+  </div>
+
+</div>
+{% endif %}
+{% endfor %}
+
+</body>
+</html>

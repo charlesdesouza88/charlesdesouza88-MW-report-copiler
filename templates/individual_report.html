@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>{{ student.student_name }} — Relatório Individual</title>
+<style>
+@page { size: A4 landscape; margin: 8mm; }
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: Arial, Helvetica, sans-serif;
+  background: #fff;
+  color: #111;
+  font-size: 11px;
+  width: 277mm;
+}
+
+/* ── Header ── */
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 7px;
+  padding-bottom: 4px;
+}
+.logo { line-height: 1; }
+.logo-mister { font-size: 18px; font-weight: 900; letter-spacing: -0.5px; }
+.logo-wiz { font-size: 22px; font-weight: 900; letter-spacing: -1px; }
+.logo-wiz .star { color: #5B2D8E; }
+.header-center { text-align: center; }
+.student-name { font-size: 30px; font-weight: 900; line-height: 1; }
+.turma-line { color: #5B2D8E; font-size: 13px; font-weight: 700; margin-top: 2px; }
+.turma-line span { color: #111; }
+.teacher-block { text-align: right; }
+.teacher-label { font-size: 10px; font-weight: 700; }
+.teacher-name { font-size: 17px; font-weight: 900; color: #5B2D8E; }
+
+/* ── 2×2 grid ── */
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: auto auto;
+  gap: 7px;
+  margin-bottom: 7px;
+}
+
+/* ── Card ── */
+.card {
+  border: 2.5px solid #111;
+  border-radius: 10px;
+  padding: 10px 12px;
+  position: relative;
+  overflow: hidden;
+}
+.card-title {
+  font-size: 20px;
+  font-weight: 900;
+  margin-bottom: 6px;
+  line-height: 1;
+}
+
+/* ── Score bubble ── */
+.bubble {
+  width: 38px; height: 38px;
+  border-radius: 50%;
+  background: #5B2D8E;
+  color: #fff;
+  font-size: 22px;
+  font-weight: 900;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.bubble-abs {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+}
+.bubble-md {
+  width: 50px; height: 50px;
+  font-size: 26px;
+}
+
+/* ── PRESENÇA ── */
+.presenca-body { display: flex; gap: 12px; align-items: flex-start; }
+.pie-wrap { flex-shrink: 0; }
+.pie-legend { display: flex; gap: 6px; align-items: center; margin-top: 3px; font-size: 9px; }
+.legend-sq { width: 11px; height: 11px; border-radius: 2px; display: inline-block; }
+.pie-footer { font-size: 8.5px; font-weight: 700; text-align: center; margin-top: 3px; }
+.presenca-right { flex: 1; }
+.missed-heading { font-weight: 700; font-size: 10px; margin-bottom: 4px; }
+.missed-dates-row { display: flex; gap: 5px; flex-wrap: wrap; margin-bottom: 4px; }
+.missed-date-cell { text-align: center; }
+.missed-box { border: 2px solid #111; padding: 1px 7px; font-weight: 900; font-size: 12px; }
+.missed-date-sub { font-size: 8px; text-align: center; margin-top: 1px; }
+.missed-lesson { font-size: 9px; margin-bottom: 3px; }
+.missed-lesson strong { color: #5B2D8E; }
+.no-makeup { font-weight: 700; font-size: 10px; margin-top: 6px; }
+
+/* ── PARTICIPAÇÃO ── */
+.part-body { display: flex; gap: 10px; }
+.part-left, .part-right { flex: 1; }
+.media-label { font-size: 9px; color: #5B2D8E; font-weight: 700; margin-bottom: 4px; }
+.part-scores-row { display: flex; gap: 6px; justify-content: flex-start; margin-bottom: 6px; }
+.part-score-item { text-align: center; }
+.part-score-label { font-size: 7.5px; font-weight: 700; margin-top: 3px; line-height: 1.2; }
+.scale-list { margin-top: 4px; }
+.scale-item { display: flex; gap: 5px; font-size: 8.5px; margin-bottom: 1px; }
+.scale-num { font-weight: 700; min-width: 10px; }
+.feedback-section { }
+.fb-heading { font-size: 9px; color: #5B2D8E; font-weight: 700; margin-bottom: 3px; }
+.fb-item { border: 1px solid #bbb; padding: 2px 5px; margin-bottom: 3px; }
+.fb-item-title { font-size: 8px; font-weight: 700; }
+.fb-item-text { font-size: 9px; }
+
+/* ── DESENVOLVIMENTO ── */
+.dev-body { display: flex; gap: 10px; align-items: center; }
+.dev-bars { flex: 1; }
+.bar-row { margin-bottom: 5px; }
+.bar-track {
+  height: 13px;
+  background: #E0CCEE;
+  border-radius: 4px;
+  overflow: hidden;
+  width: 100%;
+}
+.bar-fill {
+  height: 100%;
+  background: #5B2D8E;
+  border-radius: 4px;
+}
+.bar-label { font-size: 10px; font-weight: 900; font-style: italic; margin-top: 1px; }
+.radar-wrap { flex-shrink: 0; }
+
+/* ── COMPORTAMENTO ── */
+.comp-body { }
+.comp-scores-row { display: flex; gap: 8px; justify-content: space-around; margin-bottom: 8px; }
+.comp-score-item { text-align: center; }
+.comp-score-label { font-size: 8px; font-weight: 700; color: #5B2D8E; margin-top: 3px; line-height: 1.2; }
+.comp-criteria { }
+.comp-criteria-title { font-size: 10px; font-weight: 900; margin-bottom: 3px; }
+.comp-criteria-item { font-size: 8.5px; margin-bottom: 2px; }
+.comp-criteria-item strong { color: #5B2D8E; }
+
+/* ── RECOMENDAÇÕES ── */
+.recomendacoes {
+  border: 2.5px solid #111;
+  border-radius: 10px;
+  padding: 8px 12px;
+  min-height: 36px;
+}
+.recomendacoes .card-title { display: inline; }
+.recomendacoes-text { font-size: 10px; margin-top: 3px; }
+</style>
+</head>
+<body>
+
+<!-- ── Header ── -->
+<div class="header">
+  <div class="logo">
+    <div class="logo-mister">MISTER</div>
+    <div class="logo-wiz">W<span class="star">✦</span>Z</div>
+  </div>
+  <div class="header-center">
+    <div class="student-name">{{ student.student_name }}</div>
+    <div class="turma-line">Turma: <span>{{ student.turma_display or student.turma }}</span></div>
+  </div>
+  <div class="teacher-block">
+    <div class="teacher-label">Teacher</div>
+    <div class="teacher-name">{{ student.teacher }}</div>
+  </div>
+</div>
+
+<!-- ── 2×2 Grid ── -->
+<div class="grid">
+
+  <!-- PRESENÇA -->
+  <div class="card">
+    <div class="card-title">Presença</div>
+    <div class="bubble bubble-abs">{{ pres_score }}</div>
+    <div class="presenca-body">
+      <div class="pie-wrap">
+        <svg width="108" height="108" viewBox="0 0 116 116">
+          <circle cx="58" cy="58" r="48" fill="#BBBBBB"/>
+          {% if full_circle %}
+          <circle cx="58" cy="58" r="48" fill="#5B2D8E"/>
+          {% else %}
+          <path d="{{ pie_d }}" fill="#5B2D8E"/>
+          {% endif %}
+          <text x="58" y="64" text-anchor="middle" font-size="19" font-weight="bold" fill="white" font-family="Arial">{{ pct }}%</text>
+        </svg>
+        <div class="pie-legend">
+          <span class="legend-sq" style="background:#5B2D8E"></span>Frequência
+          <span class="legend-sq" style="background:#BBBBBB"></span>Faltas
+        </div>
+        <div class="pie-footer">Nível de presença do aluno</div>
+      </div>
+      <div class="presenca-right">
+        <div class="missed-heading">Aulas perdidas</div>
+        {% if missed %}
+        <div class="missed-dates-row">
+          {% for m in missed %}
+          <div class="missed-date-cell">
+            <div class="missed-box">{{ m.aula_num }}</div>
+            <div class="missed-date-sub">{{ m.date }}</div>
+          </div>
+          {% endfor %}
+        </div>
+        {% for m in missed %}
+        <div class="missed-lesson">
+          <strong>Aula {{ m.aula_num }}: {{ m.licao_conteudo }}</strong>
+          {% if m.atividade_extra %} — {{ m.atividade_extra }}{% endif %}
+        </div>
+        {% endfor %}
+        {% else %}
+        <div style="font-size:10px;margin-top:4px;">Nenhuma falta registrada.</div>
+        {% endif %}
+        {% if needs_makeup %}
+        <div class="no-makeup" style="color:#5B2D8E;">Reposição necessária</div>
+        {% else %}
+        <div class="no-makeup">Sem necessidade de reposição</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- PARTICIPAÇÃO -->
+  <div class="card">
+    <div class="card-title">Participação</div>
+    <div class="bubble bubble-abs">{{ part_overall }}</div>
+    <div class="part-body">
+      <div class="part-left">
+        <div class="media-label">Média</div>
+        <div class="part-scores-row">
+          <div class="part-score-item">
+            <div class="bubble bubble-md">{{ part_scores[0] }}</div>
+            <div class="part-score-label">Contribuição<br>oral</div>
+          </div>
+          <div class="part-score-item">
+            <div class="bubble bubble-md">{{ part_scores[1] }}</div>
+            <div class="part-score-label">Foco e<br>atenção</div>
+          </div>
+          <div class="part-score-item">
+            <div class="bubble bubble-md">{{ part_scores[2] }}</div>
+            <div class="part-score-label">Trabalho em<br>equipe</div>
+          </div>
+        </div>
+        <div class="scale-list">
+          <div class="scale-item"><span class="scale-num">1</span>Raramente</div>
+          <div class="scale-item"><span class="scale-num">2</span>Quando solicitado</div>
+          <div class="scale-item"><span class="scale-num">3</span>Regularmente</div>
+          <div class="scale-item"><span class="scale-num">4</span>Sempre</div>
+          <div class="scale-item"><span class="scale-num">5</span>Com excelência</div>
+        </div>
+      </div>
+      <div class="part-right">
+        <div class="fb-heading">Feedback do professor</div>
+        <div class="fb-item">
+          <div class="fb-item-title">Contribuição oral</div>
+          <div class="fb-item-text">{{ student.feedback_participacao or '—' }}</div>
+        </div>
+        <div class="fb-item">
+          <div class="fb-item-title">Foco e atenção</div>
+          <div class="fb-item-text">{{ student.feedback_foco or '—' }}</div>
+        </div>
+        <div class="fb-item">
+          <div class="fb-item-title">Trabalho em equipe</div>
+          <div class="fb-item-text">{{ student.feedback_trabalho_equipe or '—' }}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- DESENVOLVIMENTO -->
+  <div class="card">
+    <div class="card-title">Desenvolvimento</div>
+    <div class="bubble bubble-abs">{{ dev_overall }}</div>
+    <div class="dev-body">
+      <div class="dev-bars">
+        {% for i in range(dev_labels|length) %}
+        {% set score = dev_scores[i] %}
+        <div class="bar-row">
+          <div class="bar-track">
+            <div class="bar-fill" style="width:{{ ((score / 5) * 100)|int }}%"></div>
+          </div>
+          <div class="bar-label">{{ dev_labels[i] }}</div>
+        </div>
+        {% endfor %}
+      </div>
+      <div class="radar-wrap">
+        <svg width="200" height="205" viewBox="-5 0 210 215" font-family="Arial">
+          <text x="100" y="12" text-anchor="middle" font-size="9" fill="#555">Avaliação de Habilidades Linguísticas</text>
+          {% for ring in grid %}
+          <polygon points="{{ ring }}" fill="none" stroke="#DDD" stroke-width="1"/>
+          {% endfor %}
+          {% for ep in axes %}
+          <line x1="100" y1="105" x2="{{ ep[0] }}" y2="{{ ep[1] }}" stroke="#DDD" stroke-width="1"/>
+          {% endfor %}
+          <polygon points="{{ pentagon }}" fill="rgba(91,45,142,0.25)" stroke="#5B2D8E" stroke-width="2"/>
+          <text x="100" y="22" text-anchor="middle" font-size="9" font-weight="bold">Audição</text>
+          <text x="198" y="82" text-anchor="end" font-size="9" font-weight="bold">Fala</text>
+          <text x="175" y="200" text-anchor="middle" font-size="9" font-weight="bold">Gramática</text>
+          <text x="25" y="200" text-anchor="middle" font-size="9" font-weight="bold">Escrita</text>
+          <text x="2" y="82" text-anchor="start" font-size="9" font-weight="bold">Leitura</text>
+          <text x="103" y="50" font-size="8" fill="#999">4</text>
+          <text x="170" y="15" font-size="8" fill="#5B2D8E">— Aluno</text>
+        </svg>
+      </div>
+    </div>
+  </div>
+
+  <!-- COMPORTAMENTO -->
+  <div class="card">
+    <div class="card-title">Comportamento</div>
+    <div class="bubble bubble-abs">{{ comp_overall }}</div>
+    <div class="comp-body">
+      <div class="comp-scores-row">
+        <div class="comp-score-item">
+          <div class="bubble bubble-md">{{ comp_scores[0] }}</div>
+          <div class="comp-score-label">Organização</div>
+        </div>
+        <div class="comp-score-item">
+          <div class="bubble bubble-md">{{ comp_scores[1] }}</div>
+          <div class="comp-score-label">Pontualidade</div>
+        </div>
+        <div class="comp-score-item">
+          <div class="bubble bubble-md">{{ comp_scores[2] }}</div>
+          <div class="comp-score-label">Respeito ás regras<br>da sala de aula</div>
+        </div>
+      </div>
+      <div class="comp-criteria">
+        <div class="comp-criteria-title">Critérios:</div>
+        <div class="comp-criteria-item"><strong>Organização:</strong> Trazer o material completo e mesa organizada.</div>
+        <div class="comp-criteria-item"><strong>Pontualidade:</strong> Horário de chegada e saída dentro da programado.</div>
+        <div class="comp-criteria-item"><strong>Respeito ás regras da sala de aula:</strong> Respeito e colaboração com ambiente de aula.</div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /.grid -->
+
+<!-- RECOMENDAÇÕES -->
+<div class="recomendacoes">
+  <span class="card-title">Recomendações: </span>
+  <span class="recomendacoes-text">{{ student.recomendacoes or '' }}</span>
+</div>
+
+</body>
+</html>
