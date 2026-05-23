@@ -39,6 +39,7 @@
       </div>
       <div style="display:flex; gap:8px;">
         <button type="submit" class="btn btn-primary btn-sm" style="flex:1; justify-content:center;">↑ Fazer upload</button>
+        <a href="{{ url_for('download_template', name='students') }}" class="btn btn-ghost btn-sm">⇩ Template</a>
         {% if students_exists %}
         <a href="{{ url_for('download_csv', name='students') }}" class="btn btn-ghost btn-sm">↓ Baixar atual</a>
         {% endif %}
@@ -83,6 +84,7 @@
       </div>
       <div style="display:flex; gap:8px;">
         <button type="submit" class="btn btn-primary btn-sm" style="flex:1; justify-content:center;">↑ Fazer upload</button>
+        <a href="{{ url_for('download_template', name='lessons') }}" class="btn btn-ghost btn-sm">⇩ Template</a>
         {% if lessons_exists %}
         <a href="{{ url_for('download_csv', name='lessons') }}" class="btn btn-ghost btn-sm">↓ Baixar atual</a>
         {% endif %}

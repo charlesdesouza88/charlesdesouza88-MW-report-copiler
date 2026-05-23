@@ -80,6 +80,119 @@ SCORE_FIELDS = {
     'writing', 'reading', 'gramatica', 'trabalho_equipe', 'organizacao',
     'pontualidade', 'respeito_regras',
 }
+LESSON_FIELDS = [
+    'turma', 'aula_num', 'date', 'licao_conteudo', 'atividade_extra', 'habilidades'
+]
+
+TEMPLATE_ROWS = {
+    'students': {
+        'teacher': 'Chuck',
+        'turma': 'MASTER',
+        'turma_display': 'Masters',
+        'nivel': 'Adults Book 4',
+        'horario': 'Terca e quinta, 19:00 - 20:00',
+        'student_name': 'Jane Doe',
+        'participacao': '4',
+        'comportamento': '3',
+        'speaking': '4',
+        'listening': '5',
+        'foco': '4',
+        'writing': '3',
+        'reading': '4',
+        'gramatica': '3',
+        'trabalho_equipe': '4',
+        'organizacao': '3',
+        'pontualidade': '4',
+        'respeito_regras': '4',
+        'faltas': '1',
+        'missed_aulas': '2,5',
+        'aula_extra': 'Reforco',
+        'feedback_participacao': 'Participa bem em aula.',
+        'feedback_foco': 'Melhorar foco nas atividades longas.',
+        'feedback_trabalho_equipe': 'Boa colaboracao com colegas.',
+        'recomendacoes': 'Praticar speaking em casa 2x por semana.',
+        'observacao': 'Exemplo de preenchimento',
+    },
+    'lessons': {
+        'turma': 'MASTER',
+        'aula_num': '1',
+        'date': '03/09',
+        'licao_conteudo': 'Lesson 1: Introductions',
+        'atividade_extra': 'Role-play em duplas',
+        'habilidades': 'Speaking, Listening',
+    },
+}
+
+
+def _read_csv_text(uploaded_file):
+    try:
+        return uploaded_file.read().decode('utf-8-sig'), None
+    except UnicodeDecodeError:
+        return None, 'Arquivo deve estar em UTF-8.'
+
+
+def _validate_csv(key, text):
+    reader = csv.DictReader(io.StringIO(text))
+    if not reader.fieldnames:
+        return ['CSV sem cabecalho valido.']
+
+    headers = [h.strip() for h in reader.fieldnames if h is not None]
+    required = STUDENT_FIELDS if key == 'students' else LESSON_FIELDS
+    missing = [f for f in required if f not in headers]
+    if missing:
+        return [f'Colunas obrigatorias ausentes: {", ".join(missing)}']
+
+    rows = []
+    for raw in reader:
+        row = {}
+        for k, v in raw.items():
+            if k is None:
+                continue
+            row[k.strip()] = (v or '').strip()
+        if any(row.values()):
+            rows.append(row)
+
+    if not rows:
+        return ['CSV sem linhas de dados.']
+
+    errors = []
+    for idx, row in enumerate(rows, start=2):
+        if key == 'students':
+            if not row.get('turma'):
+                errors.append(f'Linha {idx}: turma nao pode estar vazia.')
+            if not row.get('student_name'):
+                errors.append(f'Linha {idx}: student_name nao pode estar vazio.')
+
+            for field in SCORE_FIELDS:
+                val = row.get(field, '')
+                if not val:
+                    continue
+                try:
+                    num = int(float(val))
+                except ValueError:
+                    errors.append(f'Linha {idx}: {field} deve ser numero de 1 a 5.')
+                    continue
+                if num < 1 or num > 5:
+                    errors.append(f'Linha {idx}: {field} deve estar entre 1 e 5.')
+
+            faltas = row.get('faltas', '')
+            if faltas:
+                try:
+                    if int(float(faltas)) < 0:
+                        errors.append(f'Linha {idx}: faltas nao pode ser negativo.')
+                except ValueError:
+                    errors.append(f'Linha {idx}: faltas deve ser numero inteiro.')
+        else:
+            if not row.get('turma'):
+                errors.append(f'Linha {idx}: turma nao pode estar vazia.')
+            if not row.get('aula_num'):
+                errors.append(f'Linha {idx}: aula_num nao pode estar vazio.')
+
+        if len(errors) >= 10:
+            errors.append('Muitos erros encontrados; corrija os primeiros e tente novamente.')
+            break
+
+    return errors
 
 
 def login_required(f):
@@ -204,9 +317,19 @@ def upload():
         for key, label in [('students', 'Alunos'), ('lessons', 'Aulas')]:
             f = request.files.get(key)
             if f and f.filename:
+                text, decode_error = _read_csv_text(f)
+                if decode_error:
+                    errors.append(f'Erro no CSV de {label}: {decode_error}')
+                    continue
+
+                validation_errors = _validate_csv(key, text)
+                if validation_errors:
+                    errors.append(f'Erro no CSV de {label}: {validation_errors[0]}')
+                    continue
+
                 target = DATA_DIR / f'{key}.csv'
                 try:
-                    f.save(target)
+                    target.write_text(text, encoding='utf-8')
                     messages.append(f'{label} carregado: {f.filename}')
                 except OSError as exc:
                     errors.append(f'Erro ao salvar {label}: {exc}')
@@ -214,6 +337,31 @@ def upload():
     lessons_exists = (DATA_DIR / 'lessons.csv').exists()
     return render_template('upload.html', messages=messages, errors=errors,
         students_exists=students_exists, lessons_exists=lessons_exists)
+
+
+@app.route('/upload/template/<name>')
+@login_required
+def download_template(name):
+    if name == 'students':
+        fields = STUDENT_FIELDS
+    elif name == 'lessons':
+        fields = LESSON_FIELDS
+    else:
+        abort(404)
+
+    buf = io.StringIO()
+    writer = csv.DictWriter(buf, fieldnames=fields)
+    writer.writeheader()
+    writer.writerow(TEMPLATE_ROWS[name])
+
+    data = io.BytesIO(buf.getvalue().encode('utf-8'))
+    data.seek(0)
+    return send_file(
+        data,
+        as_attachment=True,
+        download_name=f'{name}_template.csv',
+        mimetype='text/csv',
+    )
 
 
 @app.route('/upload/download/<name>')
@@ -232,8 +380,31 @@ def download_csv(name):
 @app.route('/generate', methods=['POST'])
 @login_required
 def generate():
-    students = load_csv(DATA_DIR / 'students.csv')
-    lessons = load_csv(DATA_DIR / 'lessons.csv')
+    students_file = DATA_DIR / 'students.csv'
+    lessons_file = DATA_DIR / 'lessons.csv'
+    if not students_file.exists() or not lessons_file.exists():
+        return redirect(url_for('upload'))
+
+    students_text = students_file.read_text(encoding='utf-8')
+    lessons_text = lessons_file.read_text(encoding='utf-8')
+    students_errors = _validate_csv('students', students_text)
+    lessons_errors = _validate_csv('lessons', lessons_text)
+    if students_errors or lessons_errors:
+        errors = []
+        if students_errors:
+            errors.append(f'CSV de Alunos invalido: {students_errors[0]}')
+        if lessons_errors:
+            errors.append(f'CSV de Aulas invalido: {lessons_errors[0]}')
+        return render_template(
+            'upload.html',
+            messages=[],
+            errors=errors,
+            students_exists=students_file.exists(),
+            lessons_exists=lessons_file.exists(),
+        )
+
+    students = load_csv(students_file)
+    lessons = load_csv(lessons_file)
     env = Environment(loader=FileSystemLoader(str(TMPL_DIR)), autoescape=False)
     generate_individual_reports(students, lessons, env, OUT_DIR)
     generate_class_diagnostics(students, lessons, env, OUT_DIR)

@@ -1,3 +1,4 @@
+import io
 from pathlib import Path
 
 import app as web_app
@@ -93,3 +94,60 @@ def test_reports_preview_path_is_sanitized(monkeypatch, tmp_path):
 
     assert ok.status_code == 200
     assert blocked.status_code == 404
+
+
+def test_upload_invalid_students_csv_shows_error_and_does_not_crash(monkeypatch, tmp_path):
+    monkeypatch.setattr(web_app, "ADMIN_PASSWORD", "testpass")
+    monkeypatch.setattr(web_app, "DATA_DIR", tmp_path / "data")
+    monkeypatch.setattr(web_app, "OUT_DIR", tmp_path / "output")
+    web_app.DATA_DIR.mkdir()
+    web_app.OUT_DIR.mkdir()
+
+    client = web_app.app.test_client()
+    _login(client)
+
+    bad_students = io.BytesIO(b"teacher,turma\nChuck,MASTER\n")
+    response = client.post(
+        "/upload",
+        data={"students": (bad_students, "students.csv")},
+        content_type="multipart/form-data",
+    )
+
+    assert response.status_code == 200
+    assert b"Erro no CSV de Alunos" in response.data
+    assert not (web_app.DATA_DIR / "students.csv").exists()
+
+
+def test_upload_template_students_download(monkeypatch, tmp_path):
+    monkeypatch.setattr(web_app, "ADMIN_PASSWORD", "testpass")
+    monkeypatch.setattr(web_app, "DATA_DIR", tmp_path / "data")
+    monkeypatch.setattr(web_app, "OUT_DIR", tmp_path / "output")
+    web_app.DATA_DIR.mkdir()
+    web_app.OUT_DIR.mkdir()
+
+    client = web_app.app.test_client()
+    _login(client)
+
+    response = client.get("/upload/template/students")
+
+    assert response.status_code == 200
+    assert "attachment;" in response.headers.get("Content-Disposition", "")
+    assert "students_template.csv" in response.headers.get("Content-Disposition", "")
+    assert b"teacher,turma,turma_display" in response.data
+
+
+def test_upload_template_lessons_download(monkeypatch, tmp_path):
+    monkeypatch.setattr(web_app, "ADMIN_PASSWORD", "testpass")
+    monkeypatch.setattr(web_app, "DATA_DIR", tmp_path / "data")
+    monkeypatch.setattr(web_app, "OUT_DIR", tmp_path / "output")
+    web_app.DATA_DIR.mkdir()
+    web_app.OUT_DIR.mkdir()
+
+    client = web_app.app.test_client()
+    _login(client)
+
+    response = client.get("/upload/template/lessons")
+
+    assert response.status_code == 200
+    assert "lessons_template.csv" in response.headers.get("Content-Disposition", "")
+    assert b"turma,aula_num,date,licao_conteudo" in response.data
