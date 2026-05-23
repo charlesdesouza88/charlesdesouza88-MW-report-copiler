@@ -1,0 +1,192 @@
+{% extends 'base.html' %}
+{% block title %}{{ 'Novo aluno' if is_new else student.student_name }}{% endblock %}
+{% block page_title %}{{ 'Novo aluno' if is_new else 'Editar: ' + student.student_name }}{% endblock %}
+
+{% block topbar_actions %}
+  <a href="{{ url_for('students') }}" class="btn btn-ghost">← Voltar</a>
+{% endblock %}
+
+{% block content %}
+<form method="post" style="max-width: 860px;">
+
+  <!-- Info básica -->
+  <div class="form-section">
+    <div class="form-section-title">Informações básicas</div>
+    <div class="form-grid form-grid-2">
+      <div class="form-group">
+        <label>Nome do aluno *</label>
+        <input type="text" name="student_name" value="{{ student.student_name or '' }}" required>
+      </div>
+      <div class="form-group">
+        <label>Professor</label>
+        <input type="text" name="teacher" value="{{ student.teacher or '' }}">
+      </div>
+      <div class="form-group">
+        <label>Turma (ID)</label>
+        <input type="text" name="turma" value="{{ student.turma or '' }}" placeholder="ex: MASTER">
+      </div>
+      <div class="form-group">
+        <label>Turma (nome exibido)</label>
+        <input type="text" name="turma_display" value="{{ student.turma_display or '' }}" placeholder="ex: Masters">
+      </div>
+      <div class="form-group">
+        <label>Nível</label>
+        <input type="text" name="nivel" value="{{ student.nivel or '' }}" placeholder="ex: Adults Book 4">
+      </div>
+      <div class="form-group">
+        <label>Horário</label>
+        <input type="text" name="horario" value="{{ student.horario or '' }}" placeholder="ex: Terça e quinta, 19:00">
+      </div>
+    </div>
+  </div>
+
+  <!-- Habilidades linguísticas -->
+  <div class="form-section">
+    <div class="form-section-title">Habilidades linguísticas (1–5)</div>
+    {% set skill_fields = [
+      ('speaking',  'Fala (Speaking)'),
+      ('listening', 'Audição (Listening)'),
+      ('writing',   'Escrita (Writing)'),
+      ('reading',   'Leitura (Reading)'),
+      ('gramatica', 'Gramática'),
+    ] %}
+    <div style="display:flex; flex-direction:column; gap:10px;">
+      {% for field, label in skill_fields %}
+      <div class="score-row">
+        <span class="score-label">{{ label }}</span>
+        <div class="score-picker" id="picker-{{ field }}">
+          {% for v in range(1,6) %}
+          <button type="button" class="score-btn {% if (student.get(field) or '3')|int == v %}active{% endif %}"
+                  data-val="{{ v }}">{{ v }}</button>
+          {% endfor %}
+        </div>
+        <input type="hidden" name="{{ field }}" id="val-{{ field }}" value="{{ student.get(field) or '3' }}">
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- Participação -->
+  <div class="form-section">
+    <div class="form-section-title">Participação (1–5)</div>
+    {% set part_fields = [
+      ('participacao',    'Contribuição oral'),
+      ('foco',            'Foco e atenção'),
+      ('trabalho_equipe', 'Trabalho em equipe'),
+    ] %}
+    <div style="display:flex; flex-direction:column; gap:10px; margin-bottom:16px;">
+      {% for field, label in part_fields %}
+      <div class="score-row">
+        <span class="score-label">{{ label }}</span>
+        <div class="score-picker" id="picker-{{ field }}">
+          {% for v in range(1,6) %}
+          <button type="button" class="score-btn {% if (student.get(field) or '3')|int == v %}active{% endif %}"
+                  data-val="{{ v }}">{{ v }}</button>
+          {% endfor %}
+        </div>
+        <input type="hidden" name="{{ field }}" id="val-{{ field }}" value="{{ student.get(field) or '3' }}">
+      </div>
+      {% endfor %}
+    </div>
+    <div class="form-grid form-grid-3">
+      <div class="form-group">
+        <label>Feedback — Contribuição oral</label>
+        <textarea name="feedback_participacao">{{ student.feedback_participacao or '' }}</textarea>
+      </div>
+      <div class="form-group">
+        <label>Feedback — Foco e atenção</label>
+        <textarea name="feedback_foco">{{ student.feedback_foco or '' }}</textarea>
+      </div>
+      <div class="form-group">
+        <label>Feedback — Trabalho em equipe</label>
+        <textarea name="feedback_trabalho_equipe">{{ student.feedback_trabalho_equipe or '' }}</textarea>
+      </div>
+    </div>
+  </div>
+
+  <!-- Comportamento -->
+  <div class="form-section">
+    <div class="form-section-title">Comportamento (1–5)</div>
+    {% set comp_fields = [
+      ('organizacao',      'Organização'),
+      ('pontualidade',     'Pontualidade'),
+      ('respeito_regras',  'Respeito às regras'),
+      ('comportamento',    'Comportamento geral'),
+    ] %}
+    <div style="display:flex; flex-direction:column; gap:10px;">
+      {% for field, label in comp_fields %}
+      <div class="score-row">
+        <span class="score-label">{{ label }}</span>
+        <div class="score-picker" id="picker-{{ field }}">
+          {% for v in range(1,6) %}
+          <button type="button" class="score-btn {% if (student.get(field) or '3')|int == v %}active{% endif %}"
+                  data-val="{{ v }}">{{ v }}</button>
+          {% endfor %}
+        </div>
+        <input type="hidden" name="{{ field }}" id="val-{{ field }}" value="{{ student.get(field) or '3' }}">
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- Presença -->
+  <div class="form-section">
+    <div class="form-section-title">Presença</div>
+    <div class="form-grid form-grid-3">
+      <div class="form-group">
+        <label>Faltas</label>
+        <input type="number" name="faltas" value="{{ student.faltas or '0' }}" min="0">
+      </div>
+      <div class="form-group">
+        <label>Aulas perdidas (números separados por vírgula)</label>
+        <input type="text" name="missed_aulas" value="{{ student.missed_aulas or '' }}" placeholder="ex: 3,7,11">
+      </div>
+      <div class="form-group">
+        <label>Aula extra</label>
+        <select name="aula_extra">
+          <option value="" {% if not student.aula_extra %}selected{% endif %}>Nenhuma</option>
+          <option value="Reforço" {% if student.aula_extra == 'Reforço' %}selected{% endif %}>Reforço</option>
+          <option value="Reposição" {% if student.aula_extra in ('Reposição','Reposicao') %}selected{% endif %}>Reposição</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <!-- Observações -->
+  <div class="form-section">
+    <div class="form-section-title">Observações</div>
+    <div class="form-grid form-grid-2">
+      <div class="form-group">
+        <label>Recomendações</label>
+        <textarea name="recomendacoes">{{ student.recomendacoes or '' }}</textarea>
+      </div>
+      <div class="form-group">
+        <label>Observação geral</label>
+        <textarea name="observacao">{{ student.observacao or '' }}</textarea>
+      </div>
+    </div>
+  </div>
+
+  <div class="flex gap-12">
+    <button type="submit" class="btn btn-primary">✓ &nbsp;{{ 'Criar aluno' if is_new else 'Salvar alterações' }}</button>
+    <a href="{{ url_for('students') }}" class="btn btn-ghost">Cancelar</a>
+  </div>
+
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.querySelectorAll('.score-picker').forEach(picker => {
+  const fieldId = picker.id.replace('picker-', '');
+  const hidden = document.getElementById('val-' + fieldId);
+  picker.querySelectorAll('.score-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      picker.querySelectorAll('.score-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      hidden.value = btn.dataset.val;
+    });
+  });
+});
+</script>
+{% endblock %}

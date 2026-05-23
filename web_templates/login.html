@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mister Wiz — Login</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: Arial, Helvetica, sans-serif;
+  background: #4A1F7C;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.login-card {
+  background: #fff;
+  border-radius: 16px;
+  padding: 44px 40px 36px;
+  width: 360px;
+  box-shadow: 0 24px 64px rgba(0,0,0,0.28);
+}
+.logo { text-align: center; margin-bottom: 28px; }
+.logo-mister { font-size: 12px; font-weight: 900; color: #888; letter-spacing: 3px; }
+.logo-wiz { font-size: 44px; font-weight: 900; color: #111; letter-spacing: -2px; line-height: 1; }
+.logo-wiz .star { color: #5B2D8E; }
+.logo-sub { font-size: 10px; color: #999; letter-spacing: 2px; margin-top: 4px; text-transform: uppercase; }
+h2 { font-size: 15px; font-weight: 900; color: #111; margin-bottom: 20px; text-align: center; }
+.form-group { margin-bottom: 16px; }
+label { display: block; font-size: 10px; font-weight: 700; color: #666; text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 6px; }
+input[type=password] {
+  width: 100%; padding: 11px 14px;
+  border: 1.5px solid #DDD; border-radius: 8px;
+  font-size: 14px; font-family: Arial, sans-serif;
+  transition: border-color 0.12s;
+}
+input[type=password]:focus { outline: none; border-color: #5B2D8E; }
+.error { background: #FADBD8; color: #C0392B; border: 1px solid #F1948A; border-radius: 7px; padding: 10px 14px; font-size: 12px; font-weight: 600; margin-bottom: 16px; }
+.btn-submit {
+  width: 100%; padding: 12px; background: #5B2D8E; color: #fff;
+  border: none; border-radius: 8px; font-size: 14px; font-weight: 900;
+  cursor: pointer; transition: background 0.12s;
+}
+.btn-submit:hover { background: #4A1F7C; }
+.hint { text-align: center; font-size: 11px; color: #BBB; margin-top: 20px; }
+</style>
+</head>
+<body>
+<div class="login-card">
+  <div class="logo">
+    <div class="logo-mister">MISTER</div>
+    <div class="logo-wiz">W<span class="star">✦</span>Z</div>
+    <div class="logo-sub">Admin Dashboard</div>
+  </div>
+  <h2>Entrar</h2>
+  {% if error %}
+  <div class="error">{{ error }}</div>
+  {% endif %}
+  <form method="post">
+    <div class="form-group">
+      <label>Senha de acesso</label>
+      <input type="password" name="password" placeholder="••••••••" autofocus>
+    </div>
+    <button type="submit" class="btn-submit">Entrar</button>
+  </form>
+  <div class="hint">Defina a senha via variável de ambiente<br><code>ADMIN_PASSWORD</code></div>
+</div>
+</body>
+</html>

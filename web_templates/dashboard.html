@@ -1,0 +1,78 @@
+{% extends 'base.html' %}
+{% block title %}Dashboard{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+
+{% block topbar_actions %}
+  {% if data_ready %}
+  <form method="post" action="{{ url_for('generate') }}">
+    <button type="submit" class="btn btn-primary">▶ Gerar Relatórios</button>
+  </form>
+  {% endif %}
+{% endblock %}
+
+{% block content %}
+
+<div class="stat-grid">
+  <div class="stat-card">
+    <div class="stat-label">Alunos</div>
+    <div class="stat-value">{{ student_count }}</div>
+    <div class="stat-sub">cadastrados</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Turmas</div>
+    <div class="stat-value">{{ turma_count }}</div>
+    <div class="stat-sub">ativas</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Aulas</div>
+    <div class="stat-value">{{ lesson_count }}</div>
+    <div class="stat-sub">registradas</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Relatórios</div>
+    <div class="stat-value">{{ report_count }}</div>
+    <div class="stat-sub">gerados</div>
+  </div>
+</div>
+
+<div style="display:grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+
+  <div class="card">
+    <div class="section-title" style="margin-bottom:14px">Ações rápidas</div>
+    <div style="display:flex; flex-direction:column; gap:10px;">
+      <a href="{{ url_for('upload') }}" class="btn btn-outline" style="justify-content:center;">↑ &nbsp;Fazer upload de CSV</a>
+      <a href="{{ url_for('students') }}" class="btn btn-outline" style="justify-content:center;">◉ &nbsp;Gerenciar alunos</a>
+      {% if data_ready %}
+      <form method="post" action="{{ url_for('generate') }}">
+        <button type="submit" class="btn btn-primary" style="width:100%; justify-content:center;">▶ &nbsp;Gerar todos os relatórios</button>
+      </form>
+      {% endif %}
+      <a href="{{ url_for('reports') }}" class="btn btn-ghost" style="justify-content:center;">◈ &nbsp;Ver relatórios gerados</a>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="section-title" style="margin-bottom:14px">Turmas ativas</div>
+    {% if turmas %}
+    <div style="display:flex; flex-direction:column; gap:8px;">
+      {% for t in turmas %}
+      <div style="display:flex; align-items:center; justify-content:space-between; padding: 8px 12px; background:#F4F2F8; border-radius:7px;">
+        <span style="font-weight:900; font-size:13px;">{{ t }}</span>
+        <a href="{{ url_for('students') }}?turma={{ t }}" class="btn btn-ghost btn-xs">Ver alunos</a>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="text-gray font-sm">Nenhum dado carregado ainda. <a href="{{ url_for('upload') }}" class="text-purple">Fazer upload de CSV →</a></p>
+    {% endif %}
+  </div>
+
+</div>
+
+{% if not data_ready %}
+<div class="alert alert-info" style="margin-top:16px;">
+  ⚠ &nbsp;Dados não encontrados. <a href="{{ url_for('upload') }}" style="color:inherit; font-weight:900;">Faça o upload dos arquivos students.csv e lessons.csv →</a>
+</div>
+{% endif %}
+
+{% endblock %}

@@ -1,0 +1,102 @@
+{% extends 'base.html' %}
+{% block title %}Relatórios{% endblock %}
+{% block page_title %}Relatórios gerados{% endblock %}
+
+{% block topbar_actions %}
+  {% if individual or diagnostics %}
+  <a href="{{ url_for('download_all') }}" class="btn btn-outline btn-sm">↓ Baixar todos (.zip)</a>
+  {% endif %}
+  <form method="post" action="{{ url_for('generate') }}" style="display:inline;">
+    <button type="submit" class="btn btn-primary btn-sm">▶ Regenerar</button>
+  </form>
+{% endblock %}
+
+{% block content %}
+
+{% if not individual and not diagnostics %}
+<div class="card" style="text-align:center; padding:48px;">
+  <div style="font-size:40px; margin-bottom:12px;">◈</div>
+  <p class="text-gray" style="margin-bottom:16px;">Nenhum relatório gerado ainda.</p>
+  <form method="post" action="{{ url_for('generate') }}">
+    <button type="submit" class="btn btn-primary">▶ Gerar relatórios</button>
+  </form>
+</div>
+{% else %}
+
+{% if individual %}
+<div class="section-title mb-16">Relatórios individuais ({{ individual|length }})</div>
+<div class="table-wrap mb-24">
+  <table>
+    <thead>
+      <tr>
+        <th>Arquivo</th>
+        <th>Turma</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for f in individual %}
+      {% set parts = f.stem.split('_') %}
+      <tr>
+        <td><strong>{{ f.stem.replace('_', ' ') }}</strong></td>
+        <td><span class="tag">{{ parts[0] }}</span></td>
+        <td>
+          <div class="flex gap-8" style="justify-content:flex-end;">
+            <a href="{{ url_for('preview', filename=f.name) }}" target="_blank" class="btn btn-ghost btn-xs">👁 Visualizar</a>
+            <a href="{{ url_for('preview', filename=f.name) }}" target="_blank"
+               onclick="openPrint(event, '{{ url_for('preview', filename=f.name) }}')"
+               class="btn btn-ghost btn-xs">🖨 Imprimir</a>
+            <a href="{{ url_for('download_report', filename=f.name) }}" class="btn btn-primary btn-xs">↓ Baixar</a>
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+{% if diagnostics %}
+<div class="section-title mb-16">Diagnósticos de turma ({{ diagnostics|length }})</div>
+<div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>Turma</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for f in diagnostics %}
+      {% set turma = f.stem.replace('_class_diagnostic', '') %}
+      <tr>
+        <td><strong><span class="tag" style="margin-right:8px;">{{ turma }}</span> Diagnóstico de turma</strong></td>
+        <td>
+          <div class="flex gap-8" style="justify-content:flex-end;">
+            <a href="{{ url_for('preview', filename=f.name) }}" target="_blank" class="btn btn-ghost btn-xs">👁 Visualizar</a>
+            <a href="{{ url_for('preview', filename=f.name) }}" target="_blank"
+               onclick="openPrint(event, '{{ url_for('preview', filename=f.name) }}')"
+               class="btn btn-ghost btn-xs">🖨 Imprimir</a>
+            <a href="{{ url_for('download_report', filename=f.name) }}" class="btn btn-primary btn-xs">↓ Baixar</a>
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+{% endif %}
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+function openPrint(e, url) {
+  e.preventDefault();
+  const w = window.open(url, '_blank');
+  w.addEventListener('load', () => w.print());
+}
+</script>
+{% endblock %}

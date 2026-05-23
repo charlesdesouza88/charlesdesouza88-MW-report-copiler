@@ -1,0 +1,97 @@
+{% extends 'base.html' %}
+{% block title %}Alunos{% endblock %}
+{% block page_title %}Alunos{% endblock %}
+
+{% block topbar_actions %}
+  <a href="{{ url_for('student_new') }}" class="btn btn-primary">+ Novo aluno</a>
+{% endblock %}
+
+{% block content %}
+
+{% if turmas %}
+<div class="flex gap-8 mb-16" id="turma-filter">
+  <button class="btn btn-sm btn-primary filter-btn" data-turma="">Todos</button>
+  {% for t in turmas %}
+  <button class="btn btn-sm btn-ghost filter-btn" data-turma="{{ t }}">{{ t }}</button>
+  {% endfor %}
+</div>
+{% endif %}
+
+{% if students %}
+<div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Nome</th>
+        <th>Turma</th>
+        <th>Nível</th>
+        <th>Fala</th>
+        <th>Audição</th>
+        <th>Escrita</th>
+        <th>Leitura</th>
+        <th>Gramática</th>
+        <th>Faltas</th>
+        <th>Aula Extra</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for s in students %}
+      <tr class="student-row" data-turma="{{ s.turma }}">
+        <td class="text-gray font-sm">{{ loop.index }}</td>
+        <td><strong>{{ s.student_name }}</strong></td>
+        <td><span class="tag">{{ s.turma }}</span></td>
+        <td class="text-gray font-sm">{{ s.nivel or '—' }}</td>
+        <td><div style="width:26px;height:26px;border-radius:50%;background:#5B2D8E;color:#fff;font-size:12px;font-weight:900;display:flex;align-items:center;justify-content:center;">{{ s.speaking or '—' }}</div></td>
+        <td><div style="width:26px;height:26px;border-radius:50%;background:#5B2D8E;color:#fff;font-size:12px;font-weight:900;display:flex;align-items:center;justify-content:center;">{{ s.listening or '—' }}</div></td>
+        <td><div style="width:26px;height:26px;border-radius:50%;background:#5B2D8E;color:#fff;font-size:12px;font-weight:900;display:flex;align-items:center;justify-content:center;">{{ s.writing or '—' }}</div></td>
+        <td><div style="width:26px;height:26px;border-radius:50%;background:#5B2D8E;color:#fff;font-size:12px;font-weight:900;display:flex;align-items:center;justify-content:center;">{{ s.reading or '—' }}</div></td>
+        <td><div style="width:26px;height:26px;border-radius:50%;background:#5B2D8E;color:#fff;font-size:12px;font-weight:900;display:flex;align-items:center;justify-content:center;">{{ s.gramatica or '—' }}</div></td>
+        <td>{{ s.faltas or '0' }}</td>
+        <td>
+          {% if s.aula_extra %}
+          <span class="tag tag-orange">{{ s.aula_extra }}</span>
+          {% else %}
+          <span class="text-gray font-sm">—</span>
+          {% endif %}
+        </td>
+        <td>
+          <div class="flex gap-8">
+            <a href="{{ url_for('student_edit', idx=loop.index0) }}" class="btn btn-ghost btn-xs">Editar</a>
+            <form method="post" action="{{ url_for('student_delete', idx=loop.index0) }}"
+                  onsubmit="return confirm('Excluir {{ s.student_name }}?')">
+              <button type="submit" class="btn btn-danger btn-xs">✕</button>
+            </form>
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="card" style="text-align:center; padding:48px;">
+  <p class="text-gray" style="margin-bottom:16px;">Nenhum aluno cadastrado.</p>
+  <a href="{{ url_for('upload') }}" class="btn btn-primary">↑ Fazer upload de CSV</a>
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.querySelectorAll('.filter-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const turma = btn.dataset.turma;
+    document.querySelectorAll('.filter-btn').forEach(b => {
+      b.className = 'btn btn-sm btn-ghost filter-btn';
+    });
+    btn.className = 'btn btn-sm btn-primary filter-btn';
+    document.querySelectorAll('.student-row').forEach(row => {
+      row.style.display = (!turma || row.dataset.turma === turma) ? '' : 'none';
+    });
+  });
+});
+</script>
+{% endblock %}
