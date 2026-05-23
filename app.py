@@ -18,6 +18,20 @@ from compiler import (generate_class_diagnostics, generate_individual_reports,
 BASE = Path(__file__).parent
 
 
+def _ensure_writable_dir(path, fallback):
+    candidate = Path(path)
+    try:
+        candidate.mkdir(parents=True, exist_ok=True)
+        probe = candidate / '.mw_write_probe'
+        probe.write_text('ok', encoding='utf-8')
+        probe.unlink(missing_ok=True)
+        return candidate
+    except OSError:
+        backup = Path(fallback)
+        backup.mkdir(parents=True, exist_ok=True)
+        return backup
+
+
 def _load_local_env():
     env_path = BASE / '.env'
     if not env_path.exists():
@@ -43,11 +57,11 @@ else:
     default_data_dir = str(BASE / 'data')
     default_out_dir = str(BASE / 'output')
 
-DATA_DIR = Path(os.environ.get('DATA_DIR', default_data_dir))
 TMPL_DIR = BASE / 'templates'
-OUT_DIR = Path(os.environ.get('OUT_DIR', default_out_dir))
-OUT_DIR.mkdir(parents=True, exist_ok=True)
-DATA_DIR.mkdir(parents=True, exist_ok=True)
+DATA_DIR = _ensure_writable_dir(
+    os.environ.get('DATA_DIR', default_data_dir), '/tmp/mw/data')
+OUT_DIR = _ensure_writable_dir(
+    os.environ.get('OUT_DIR', default_out_dir), '/tmp/mw/output')
 
 app = Flask(__name__, template_folder='web_templates')
 app.secret_key = os.environ.get('SECRET_KEY', 'mw-dev-change-in-prod')
@@ -185,15 +199,20 @@ def student_delete(idx):
 @login_required
 def upload():
     messages = []
+    errors = []
     if request.method == 'POST':
         for key, label in [('students', 'Alunos'), ('lessons', 'Aulas')]:
             f = request.files.get(key)
             if f and f.filename:
-                f.save(DATA_DIR / f'{key}.csv')
-                messages.append(f'{label} carregado: {f.filename}')
+                target = DATA_DIR / f'{key}.csv'
+                try:
+                    f.save(target)
+                    messages.append(f'{label} carregado: {f.filename}')
+                except OSError as exc:
+                    errors.append(f'Erro ao salvar {label}: {exc}')
     students_exists = (DATA_DIR / 'students.csv').exists()
     lessons_exists = (DATA_DIR / 'lessons.csv').exists()
-    return render_template('upload.html', messages=messages,
+    return render_template('upload.html', messages=messages, errors=errors,
         students_exists=students_exists, lessons_exists=lessons_exists)
 
 

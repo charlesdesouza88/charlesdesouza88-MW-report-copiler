@@ -4,6 +4,10 @@
 
 {% block content %}
 
+{% for msg in errors %}
+<div class="alert" style="background:#FADBD8; color:#A93226; border:1px solid #F1948A;">✕ &nbsp;{{ msg }}</div>
+{% endfor %}
+
 {% for msg in messages %}
 <div class="alert alert-success">✓ &nbsp;{{ msg }}</div>
 {% endfor %}
