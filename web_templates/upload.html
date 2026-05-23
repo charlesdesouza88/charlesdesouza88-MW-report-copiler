@@ -4,6 +4,38 @@
 
 {% block content %}
 
+<div class="card" style="margin-bottom:20px; background:linear-gradient(135deg, #4A1F7C 0%, #5B2D8E 58%, #7A44B3 100%); color:#fff; border:none; overflow:hidden; position:relative;">
+  <div style="position:absolute; inset:auto -40px -60px auto; width:180px; height:180px; border-radius:50%; background:rgba(255,255,255,0.08);"></div>
+  <div style="position:absolute; inset:20px auto auto 70%; width:90px; height:90px; border-radius:50%; background:rgba(255,255,255,0.05);"></div>
+  <div style="position:relative; display:grid; grid-template-columns:1.2fr 0.8fr; gap:20px; align-items:start;">
+    <div>
+      <div style="font-size:11px; letter-spacing:1.4px; text-transform:uppercase; font-weight:900; color:rgba(255,255,255,0.62); margin-bottom:8px;">Mister Wiz Data Studio</div>
+      <div style="font-size:28px; font-weight:900; line-height:1.1; margin-bottom:10px; max-width:560px;">Envie seus CSVs no formato certo e gere relatórios sem retrabalho.</div>
+      <div style="font-size:13px; line-height:1.6; color:rgba(255,255,255,0.82); max-width:620px;">
+        Baixe o template oficial, preencha os dados no mesmo padrão e depois envie os arquivos de alunos e aulas.
+        Se alguma coluna obrigatória estiver faltando, o sistema mostra o erro antes de quebrar o fluxo.
+      </div>
+    </div>
+    <div style="background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.15); border-radius:14px; padding:16px; backdrop-filter: blur(4px);">
+      <div style="font-size:11px; text-transform:uppercase; letter-spacing:1px; font-weight:900; color:rgba(255,255,255,0.65); margin-bottom:10px;">Fluxo recomendado</div>
+      <div style="display:flex; flex-direction:column; gap:10px;">
+        <div style="display:flex; gap:10px; align-items:flex-start;">
+          <div style="width:24px; height:24px; border-radius:50%; background:#fff; color:#4A1F7C; font-size:12px; font-weight:900; display:flex; align-items:center; justify-content:center; flex-shrink:0;">1</div>
+          <div style="font-size:12px; line-height:1.5; color:#fff;"><strong>Baixe o template</strong><br><span style="color:rgba(255,255,255,0.72);">Use os modelos oficiais para manter nomes de colunas e ordem esperada.</span></div>
+        </div>
+        <div style="display:flex; gap:10px; align-items:flex-start;">
+          <div style="width:24px; height:24px; border-radius:50%; background:#fff; color:#4A1F7C; font-size:12px; font-weight:900; display:flex; align-items:center; justify-content:center; flex-shrink:0;">2</div>
+          <div style="font-size:12px; line-height:1.5; color:#fff;"><strong>Preencha e envie</strong><br><span style="color:rgba(255,255,255,0.72);">Suba primeiro alunos, depois aulas, com arquivos salvos em CSV UTF-8.</span></div>
+        </div>
+        <div style="display:flex; gap:10px; align-items:flex-start;">
+          <div style="width:24px; height:24px; border-radius:50%; background:#fff; color:#4A1F7C; font-size:12px; font-weight:900; display:flex; align-items:center; justify-content:center; flex-shrink:0;">3</div>
+          <div style="font-size:12px; line-height:1.5; color:#fff;"><strong>Revise e gere</strong><br><span style="color:rgba(255,255,255,0.72);">Quando os dois arquivos estiverem válidos, gere os relatórios com um clique.</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 {% for msg in errors %}
 <div class="alert" style="background:#FADBD8; color:#A93226; border:1px solid #F1948A;">✕ &nbsp;{{ msg }}</div>
 {% endfor %}
@@ -12,89 +44,156 @@
 <div class="alert alert-success">✓ &nbsp;{{ msg }}</div>
 {% endfor %}
 
-<div style="display:grid; grid-template-columns:1fr 1fr; gap:20px; max-width:820px;">
+<div style="display:grid; grid-template-columns:1fr 1fr; gap:20px; max-width:1120px; align-items:start;">
 
   <!-- Students CSV -->
-  <div class="card">
-    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:14px;">
-      <div>
-        <div style="font-size:15px; font-weight:900;">students.csv</div>
-        <div class="font-sm text-gray" style="margin-top:2px;">Dados dos alunos</div>
-      </div>
-      {% if students_exists %}
-      <span class="tag tag-green">✓ Carregado</span>
-      {% else %}
-      <span class="tag tag-gray">Não encontrado</span>
-      {% endif %}
-    </div>
-
-    <form method="post" enctype="multipart/form-data">
-      <div style="border:2px dashed #DDD; border-radius:8px; padding:24px; text-align:center; margin-bottom:12px; cursor:pointer;"
-           onclick="this.querySelector('input').click()">
-        <div style="font-size:28px; margin-bottom:6px;">📄</div>
-        <div style="font-size:12px; color:#666; margin-bottom:8px;">Clique para selecionar ou arraste o arquivo</div>
-        <input type="file" name="students" accept=".csv" style="display:none"
-               onchange="this.closest('form').querySelector('.file-name').textContent = this.files[0]?.name || ''">
-        <div class="file-name font-sm text-purple" style="min-height:16px;"></div>
-      </div>
-      <div style="display:flex; gap:8px;">
-        <button type="submit" class="btn btn-primary btn-sm" style="flex:1; justify-content:center;">↑ Fazer upload</button>
-        <a href="{{ url_for('download_template', name='students') }}" class="btn btn-ghost btn-sm">⇩ Template</a>
+  <div class="card" style="padding:0; overflow:hidden;">
+    <div style="padding:20px 20px 16px; border-bottom:1px solid #EEE; background:linear-gradient(180deg, #FBF8FF 0%, #FFFFFF 100%);">
+      <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px; margin-bottom:12px;">
+        <div>
+          <div style="display:flex; align-items:center; gap:10px; margin-bottom:6px;">
+            <div style="width:42px; height:42px; border-radius:12px; background:#F5EEF8; color:#5B2D8E; font-size:20px; display:flex; align-items:center; justify-content:center;">◉</div>
+            <div>
+              <div style="font-size:17px; font-weight:900; color:#111;">students.csv</div>
+              <div class="font-sm text-gray" style="margin-top:3px;">Base principal com dados dos alunos, notas, faltas e feedbacks.</div>
+            </div>
+          </div>
+        </div>
         {% if students_exists %}
-        <a href="{{ url_for('download_csv', name='students') }}" class="btn btn-ghost btn-sm">↓ Baixar atual</a>
+        <span class="tag tag-green">✓ Carregado</span>
+        {% else %}
+        <span class="tag tag-gray">Não encontrado</span>
         {% endif %}
       </div>
-    </form>
+      <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px;">
+        <span style="padding:6px 10px; border-radius:999px; background:#F5EEF8; color:#5B2D8E; font-size:11px; font-weight:800;">26 colunas</span>
+        <span style="padding:6px 10px; border-radius:999px; background:#F5EEF8; color:#5B2D8E; font-size:11px; font-weight:800;">Notas de 1 a 5</span>
+        <span style="padding:6px 10px; border-radius:999px; background:#F5EEF8; color:#5B2D8E; font-size:11px; font-weight:800;">UTF-8</span>
+      </div>
+      <div style="font-size:12px; color:#666; line-height:1.6;">
+        Campos mais importantes: <strong>student_name</strong>, <strong>turma</strong>, <strong>participacao</strong>, <strong>speaking</strong>, <strong>faltas</strong> e <strong>recomendacoes</strong>.
+      </div>
+    </div>
 
-    <div style="margin-top:14px; padding-top:14px; border-top:1px solid #EEE;">
-      <div class="font-sm text-gray" style="margin-bottom:6px; font-weight:700;">Colunas esperadas:</div>
-      <div style="font-size:10px; color:#888; line-height:1.8;">
-        teacher, turma, turma_display, nivel, horario, student_name,
-        participacao, comportamento, speaking, listening, foco, writing,
-        reading, gramatica, trabalho_equipe, organizacao, pontualidade,
-        respeito_regras, faltas, missed_aulas, aula_extra,
-        feedback_participacao, feedback_foco, feedback_trabalho_equipe,
-        recomendacoes, observacao
+    <div style="padding:20px;">
+      <form method="post" enctype="multipart/form-data">
+        <div style="border:2px dashed #D8C8EB; border-radius:12px; padding:26px 18px; text-align:center; margin-bottom:14px; cursor:pointer; background:#FBF8FF;"
+             onclick="this.querySelector('input').click()">
+          <div style="width:54px; height:54px; border-radius:16px; background:#fff; color:#5B2D8E; font-size:26px; display:flex; align-items:center; justify-content:center; margin:0 auto 10px; box-shadow:0 8px 24px rgba(91,45,142,0.08);">↑</div>
+          <div style="font-size:13px; font-weight:800; color:#111; margin-bottom:6px;">Selecione o arquivo de alunos</div>
+          <div style="font-size:12px; color:#666; margin-bottom:8px;">Use o template oficial para garantir cabeçalhos corretos.</div>
+          <input type="file" name="students" accept=".csv" style="display:none"
+                 onchange="this.closest('form').querySelector('.file-name').textContent = this.files[0]?.name || ''">
+          <div class="file-name" style="min-height:18px; color:#5B2D8E; font-size:12px; font-weight:800;"></div>
+        </div>
+        <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:16px;">
+          <button type="submit" class="btn btn-primary btn-sm" style="flex:1; min-width:150px; justify-content:center;">↑ Fazer upload</button>
+          <a href="{{ url_for('download_template', name='students') }}" class="btn btn-outline btn-sm" style="justify-content:center;">⇩ Baixar template</a>
+          {% if students_exists %}
+          <a href="{{ url_for('download_csv', name='students') }}" class="btn btn-ghost btn-sm">↓ Baixar atual</a>
+          {% endif %}
+        </div>
+      </form>
+
+      <div style="border-top:1px solid #EEE; padding-top:16px;">
+        <div style="font-size:12px; font-weight:900; color:#5B2D8E; margin-bottom:8px; text-transform:uppercase; letter-spacing:0.7px;">Visual do template</div>
+        <div style="border:1px solid #E8E0F1; border-radius:12px; overflow:hidden; background:#fff;">
+          <div style="display:grid; grid-template-columns:1.1fr 0.8fr 0.9fr 0.8fr 0.8fr 0.8fr; background:#5B2D8E; color:#fff; font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:0.4px;">
+            <div style="padding:10px 12px;">student_name</div>
+            <div style="padding:10px 12px;">turma</div>
+            <div style="padding:10px 12px;">turma_display</div>
+            <div style="padding:10px 12px;">speaking</div>
+            <div style="padding:10px 12px;">listening</div>
+            <div style="padding:10px 12px;">faltas</div>
+          </div>
+          <div style="display:grid; grid-template-columns:1.1fr 0.8fr 0.9fr 0.8fr 0.8fr 0.8fr; font-size:12px; color:#333; background:#FBF8FF;">
+            <div style="padding:11px 12px; border-top:1px solid #EEE;">Jane Doe</div>
+            <div style="padding:11px 12px; border-top:1px solid #EEE;">MASTER</div>
+            <div style="padding:11px 12px; border-top:1px solid #EEE;">Masters</div>
+            <div style="padding:11px 12px; border-top:1px solid #EEE;">4</div>
+            <div style="padding:11px 12px; border-top:1px solid #EEE;">5</div>
+            <div style="padding:11px 12px; border-top:1px solid #EEE;">1</div>
+          </div>
+        </div>
+        <div style="font-size:11px; color:#777; line-height:1.6; margin-top:10px;">
+          O template baixado inclui todas as colunas obrigatórias e uma linha de exemplo para servir de modelo.
+        </div>
       </div>
     </div>
   </div>
 
   <!-- Lessons CSV -->
-  <div class="card">
-    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:14px;">
-      <div>
-        <div style="font-size:15px; font-weight:900;">lessons.csv</div>
-        <div class="font-sm text-gray" style="margin-top:2px;">Registro de aulas</div>
-      </div>
-      {% if lessons_exists %}
-      <span class="tag tag-green">✓ Carregado</span>
-      {% else %}
-      <span class="tag tag-gray">Não encontrado</span>
-      {% endif %}
-    </div>
-
-    <form method="post" enctype="multipart/form-data">
-      <div style="border:2px dashed #DDD; border-radius:8px; padding:24px; text-align:center; margin-bottom:12px; cursor:pointer;"
-           onclick="this.querySelector('input').click()">
-        <div style="font-size:28px; margin-bottom:6px;">📄</div>
-        <div style="font-size:12px; color:#666; margin-bottom:8px;">Clique para selecionar ou arraste o arquivo</div>
-        <input type="file" name="lessons" accept=".csv" style="display:none"
-               onchange="this.closest('form').querySelector('.file-name').textContent = this.files[0]?.name || ''">
-        <div class="file-name font-sm text-purple" style="min-height:16px;"></div>
-      </div>
-      <div style="display:flex; gap:8px;">
-        <button type="submit" class="btn btn-primary btn-sm" style="flex:1; justify-content:center;">↑ Fazer upload</button>
-        <a href="{{ url_for('download_template', name='lessons') }}" class="btn btn-ghost btn-sm">⇩ Template</a>
+  <div class="card" style="padding:0; overflow:hidden;">
+    <div style="padding:20px 20px 16px; border-bottom:1px solid #EEE; background:linear-gradient(180deg, #FBF8FF 0%, #FFFFFF 100%);">
+      <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px; margin-bottom:12px;">
+        <div>
+          <div style="display:flex; align-items:center; gap:10px; margin-bottom:6px;">
+            <div style="width:42px; height:42px; border-radius:12px; background:#F5EEF8; color:#5B2D8E; font-size:20px; display:flex; align-items:center; justify-content:center;">◈</div>
+            <div>
+              <div style="font-size:17px; font-weight:900; color:#111;">lessons.csv</div>
+              <div class="font-sm text-gray" style="margin-top:3px;">Cronograma de aulas com datas, conteúdos e atividades extras.</div>
+            </div>
+          </div>
+        </div>
         {% if lessons_exists %}
-        <a href="{{ url_for('download_csv', name='lessons') }}" class="btn btn-ghost btn-sm">↓ Baixar atual</a>
+        <span class="tag tag-green">✓ Carregado</span>
+        {% else %}
+        <span class="tag tag-gray">Não encontrado</span>
         {% endif %}
       </div>
-    </form>
+      <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px;">
+        <span style="padding:6px 10px; border-radius:999px; background:#F5EEF8; color:#5B2D8E; font-size:11px; font-weight:800;">6 colunas</span>
+        <span style="padding:6px 10px; border-radius:999px; background:#F5EEF8; color:#5B2D8E; font-size:11px; font-weight:800;">1 linha por aula</span>
+        <span style="padding:6px 10px; border-radius:999px; background:#F5EEF8; color:#5B2D8E; font-size:11px; font-weight:800;">Código da turma obrigatório</span>
+      </div>
+      <div style="font-size:12px; color:#666; line-height:1.6;">
+        Campos-chave: <strong>turma</strong>, <strong>aula_num</strong>, <strong>date</strong> e <strong>licao_conteudo</strong>.
+      </div>
+    </div>
 
-    <div style="margin-top:14px; padding-top:14px; border-top:1px solid #EEE;">
-      <div class="font-sm text-gray" style="margin-bottom:6px; font-weight:700;">Colunas esperadas:</div>
-      <div style="font-size:10px; color:#888; line-height:1.8;">
-        turma, aula_num, date, licao_conteudo, atividade_extra, habilidades
+    <div style="padding:20px;">
+      <form method="post" enctype="multipart/form-data">
+        <div style="border:2px dashed #D8C8EB; border-radius:12px; padding:26px 18px; text-align:center; margin-bottom:14px; cursor:pointer; background:#FBF8FF;"
+             onclick="this.querySelector('input').click()">
+          <div style="width:54px; height:54px; border-radius:16px; background:#fff; color:#5B2D8E; font-size:26px; display:flex; align-items:center; justify-content:center; margin:0 auto 10px; box-shadow:0 8px 24px rgba(91,45,142,0.08);">⇪</div>
+          <div style="font-size:13px; font-weight:800; color:#111; margin-bottom:6px;">Selecione o arquivo de aulas</div>
+          <div style="font-size:12px; color:#666; margin-bottom:8px;">Cada linha deve representar uma aula real daquela turma.</div>
+          <input type="file" name="lessons" accept=".csv" style="display:none"
+                 onchange="this.closest('form').querySelector('.file-name').textContent = this.files[0]?.name || ''">
+          <div class="file-name" style="min-height:18px; color:#5B2D8E; font-size:12px; font-weight:800;"></div>
+        </div>
+        <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:16px;">
+          <button type="submit" class="btn btn-primary btn-sm" style="flex:1; min-width:150px; justify-content:center;">↑ Fazer upload</button>
+          <a href="{{ url_for('download_template', name='lessons') }}" class="btn btn-outline btn-sm" style="justify-content:center;">⇩ Baixar template</a>
+          {% if lessons_exists %}
+          <a href="{{ url_for('download_csv', name='lessons') }}" class="btn btn-ghost btn-sm">↓ Baixar atual</a>
+          {% endif %}
+        </div>
+      </form>
+
+      <div style="border-top:1px solid #EEE; padding-top:16px;">
+        <div style="font-size:12px; font-weight:900; color:#5B2D8E; margin-bottom:8px; text-transform:uppercase; letter-spacing:0.7px;">Visual do template</div>
+        <div style="border:1px solid #E8E0F1; border-radius:12px; overflow:hidden; background:#fff;">
+          <div style="display:grid; grid-template-columns:0.8fr 0.8fr 0.8fr 1.6fr 1.1fr 1fr; background:#5B2D8E; color:#fff; font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:0.4px;">
+            <div style="padding:10px 12px;">turma</div>
+            <div style="padding:10px 12px;">aula_num</div>
+            <div style="padding:10px 12px;">date</div>
+            <div style="padding:10px 12px;">licao_conteudo</div>
+            <div style="padding:10px 12px;">atividade_extra</div>
+            <div style="padding:10px 12px;">habilidades</div>
+          </div>
+          <div style="display:grid; grid-template-columns:0.8fr 0.8fr 0.8fr 1.6fr 1.1fr 1fr; font-size:12px; color:#333; background:#FBF8FF;">
+            <div style="padding:11px 12px; border-top:1px solid #EEE;">MASTER</div>
+            <div style="padding:11px 12px; border-top:1px solid #EEE;">1</div>
+            <div style="padding:11px 12px; border-top:1px solid #EEE;">03/09</div>
+            <div style="padding:11px 12px; border-top:1px solid #EEE;">Lesson 1: Introductions</div>
+            <div style="padding:11px 12px; border-top:1px solid #EEE;">Role-play</div>
+            <div style="padding:11px 12px; border-top:1px solid #EEE;">Speaking</div>
+          </div>
+        </div>
+        <div style="font-size:11px; color:#777; line-height:1.6; margin-top:10px;">
+          O código da turma deve ser igual ao usado no arquivo de alunos para que a presença e os conteúdos sejam vinculados corretamente.
+        </div>
       </div>
     </div>
   </div>
