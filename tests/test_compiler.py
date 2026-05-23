@@ -111,3 +111,23 @@ def test_group_by_turma_groups_students():
     ])
     assert sorted(groups.keys()) == ["MASTER", "SPARK"]
     assert len(groups["MASTER"]) == 2
+
+
+def test_individual_report_renders_labeled_overall_scores():
+    from pathlib import Path
+
+    from jinja2 import Environment, FileSystemLoader
+
+    from compiler import build_student_ctx
+
+    base = Path(__file__).resolve().parent.parent
+    env = Environment(loader=FileSystemLoader(str(base / "templates")), autoescape=False)
+    html = env.get_template("individual_report.html").render(
+        **build_student_ctx(_student(), _lessons())
+    )
+
+    assert "card-header" in html
+    assert html.count('class="overall-score-label"') == 4
+    assert "bubble-abs" not in html
+    assert "Nota" in html
+    assert "Critérios" in html
