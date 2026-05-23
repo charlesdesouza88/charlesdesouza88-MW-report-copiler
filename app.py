@@ -62,7 +62,7 @@ def _save_students(students):
         writer.writerows(students)
 
 
-# ── Auth ──────────────────────────────────────────────────────────────────────
+# ── Auth ─────────────────────────────────────────────────────────────────────────────
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -81,7 +81,7 @@ def logout():
     return redirect(url_for('login'))
 
 
-# ── Dashboard ─────────────────────────────────────────────────────────────────
+# ── Dashboard ─────────────────────────────────────────────────────────────────────
 
 @app.route('/')
 @login_required
@@ -102,7 +102,7 @@ def dashboard():
     )
 
 
-# ── Students ──────────────────────────────────────────────────────────────────
+# ── Students ──────────────────────────────────────────────────────────────────────────
 
 @app.route('/students')
 @login_required
@@ -152,7 +152,7 @@ def student_delete(idx):
     return redirect(url_for('students'))
 
 
-# ── Upload ────────────────────────────────────────────────────────────────────
+# ── Upload ────────────────────────────────────────────────────────────────────────────
 
 @app.route('/upload', methods=['GET', 'POST'])
 @login_required
@@ -181,7 +181,7 @@ def download_csv(name):
     return send_file(path, as_attachment=True, download_name=f'{name}.csv')
 
 
-# ── Generate & Reports ────────────────────────────────────────────────────────
+# ── Generate & Reports ────────────────────────────────────────────────────────────────
 
 @app.route('/generate', methods=['POST'])
 @login_required
