@@ -4,6 +4,7 @@
 import csv
 import functools
 import io
+import logging
 import os
 import zipfile
 from pathlib import Path
@@ -14,7 +15,14 @@ from jinja2 import Environment, FileSystemLoader
 
 from compiler import (generate_class_diagnostics, generate_individual_reports,
                       group_by_turma, load_csv)
-from db_store import DatabaseStore
+
+try:
+    from db_store import DatabaseStore
+except Exception as exc:
+    DatabaseStore = None
+    DB_IMPORT_ERROR = exc
+else:
+    DB_IMPORT_ERROR = None
 
 BASE = Path(__file__).parent
 
@@ -51,12 +59,22 @@ def _load_local_env():
 
 _load_local_env()
 
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 DATABASE_URL = os.environ.get('DATABASE_URL', '').strip()
-DB_ENABLED = bool(DATABASE_URL)
+DB_ENABLED = bool(DATABASE_URL) and DatabaseStore is not None
 db_store = None
 if DB_ENABLED:
-    db_store = DatabaseStore(DATABASE_URL)
-    db_store.initialize()
+    try:
+        db_store = DatabaseStore(DATABASE_URL)
+        db_store.initialize()
+    except Exception as exc:
+        logger.exception('Database startup failed; falling back to CSV mode: %s', exc)
+        db_store = None
+        DB_ENABLED = False
+elif DATABASE_URL and DB_IMPORT_ERROR is not None:
+    logger.error('DATABASE_URL is set but database dependencies failed to import: %s', DB_IMPORT_ERROR)
 
 if os.environ.get('VERCEL'):
     default_data_dir = '/tmp/mw/data'
