@@ -50,6 +50,15 @@ def _load_local_env():
 
 _load_local_env()
 
+DATABASE_URL = os.environ.get('DATABASE_URL', '').strip()
+DB_ENABLED = bool(DATABASE_URL)
+db_store = None
+if DB_ENABLED:
+    from db_store import DatabaseStore
+
+    db_store = DatabaseStore(DATABASE_URL)
+    db_store.initialize()
+
 if os.environ.get('VERCEL'):
     default_data_dir = '/tmp/mw/data'
     default_out_dir = '/tmp/mw/output'
@@ -205,15 +214,51 @@ def login_required(f):
 
 
 def _load_students():
+    if db_store:
+        return db_store.load_students()
     path = DATA_DIR / 'students.csv'
     return load_csv(path) if path.exists() else []
 
 
+def _load_lessons():
+    if db_store:
+        return db_store.load_lessons()
+    path = DATA_DIR / 'lessons.csv'
+    return load_csv(path) if path.exists() else []
+
+
 def _save_students(students):
+    if db_store:
+        db_store.save_students(students)
+        return
     with open(DATA_DIR / 'students.csv', 'w', newline='', encoding='utf-8') as f:
-        writer = csv.DictWriter(f, fieldnames=STUDENT_FIELDS)
+        writer = csv.DictWriter(f, fieldnames=STUDENT_FIELDS, extrasaction='ignore')
         writer.writeheader()
         writer.writerows(students)
+
+
+def _save_lessons(lessons):
+    if db_store:
+        db_store.save_lessons(lessons)
+        return
+    with open(DATA_DIR / 'lessons.csv', 'w', newline='', encoding='utf-8') as f:
+        writer = csv.DictWriter(f, fieldnames=LESSON_FIELDS, extrasaction='ignore')
+        writer.writeheader()
+        writer.writerows(lessons)
+
+
+def _csv_rows_from_text(text):
+    reader = csv.DictReader(io.StringIO(text))
+    rows = []
+    for raw in reader:
+        row = {}
+        for k, v in raw.items():
+            if k is None:
+                continue
+            row[k.strip()] = (v or '').strip()
+        if any(row.values()):
+            rows.append(row)
+    return rows
 
 
 # ── Auth ─────────────────────────────────────────────────────────────────────────────
@@ -241,18 +286,22 @@ def logout():
 @login_required
 def dashboard():
     students = _load_students()
-    lessons_path = DATA_DIR / 'lessons.csv'
-    lessons = load_csv(lessons_path) if lessons_path.exists() else []
+    lessons = _load_lessons()
     reports = sorted(OUT_DIR.glob('*.html'))
     turmas = group_by_turma(students) if students else {}
     individual = [f for f in reports if 'class_diagnostic' not in f.name]
+    if db_store:
+        data_ready = bool(students) and bool(lessons)
+    else:
+        lessons_path = DATA_DIR / 'lessons.csv'
+        data_ready = (DATA_DIR / 'students.csv').exists() and lessons_path.exists()
     return render_template('dashboard.html',
         student_count=len(students),
         turma_count=len(turmas),
         lesson_count=len(lessons),
         report_count=len(individual),
         turmas=list(turmas.keys()),
-        data_ready=(DATA_DIR / 'students.csv').exists() and lessons_path.exists(),
+        data_ready=data_ready,
     )
 
 
@@ -327,14 +376,21 @@ def upload():
                     errors.append(f'Erro no CSV de {label}: {validation_errors[0]}')
                     continue
 
-                target = DATA_DIR / f'{key}.csv'
                 try:
-                    target.write_text(text, encoding='utf-8')
+                    rows = _csv_rows_from_text(text)
+                    if key == 'students':
+                        _save_students(rows)
+                    else:
+                        _save_lessons(rows)
                     messages.append(f'{label} carregado: {f.filename}')
                 except OSError as exc:
                     errors.append(f'Erro ao salvar {label}: {exc}')
-    students_exists = (DATA_DIR / 'students.csv').exists()
-    lessons_exists = (DATA_DIR / 'lessons.csv').exists()
+    if db_store:
+        students_exists = bool(_load_students())
+        lessons_exists = bool(_load_lessons())
+    else:
+        students_exists = (DATA_DIR / 'students.csv').exists()
+        lessons_exists = (DATA_DIR / 'lessons.csv').exists()
     return render_template('upload.html', messages=messages, errors=errors,
         students_exists=students_exists, lessons_exists=lessons_exists)
 
@@ -369,6 +425,19 @@ def download_template(name):
 def download_csv(name):
     if name not in ('students', 'lessons'):
         abort(404)
+    if db_store:
+        rows = _load_students() if name == 'students' else _load_lessons()
+        if not rows:
+            abort(404)
+        fields = STUDENT_FIELDS if name == 'students' else LESSON_FIELDS
+        buf = io.StringIO()
+        writer = csv.DictWriter(buf, fieldnames=fields, extrasaction='ignore')
+        writer.writeheader()
+        writer.writerows(rows)
+        data = io.BytesIO(buf.getvalue().encode('utf-8'))
+        data.seek(0)
+        return send_file(data, as_attachment=True, download_name=f'{name}.csv', mimetype='text/csv')
+
     path = DATA_DIR / f'{name}.csv'
     if not path.exists():
         abort(404)
@@ -380,6 +449,17 @@ def download_csv(name):
 @app.route('/generate', methods=['POST'])
 @login_required
 def generate():
+    if db_store:
+        students = _load_students()
+        lessons = _load_lessons()
+        if not students or not lessons:
+            return redirect(url_for('upload'))
+
+        env = Environment(loader=FileSystemLoader(str(TMPL_DIR)), autoescape=False)
+        generate_individual_reports(students, lessons, env, OUT_DIR)
+        generate_class_diagnostics(students, lessons, env, OUT_DIR)
+        return redirect(url_for('reports'))
+
     students_file = DATA_DIR / 'students.csv'
     lessons_file = DATA_DIR / 'lessons.csv'
     if not students_file.exists() or not lessons_file.exists():

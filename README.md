@@ -74,6 +74,28 @@ To run the test battery:
 pytest -q
 ```
 
+## Database mode (optional)
+
+The app can run in two storage modes:
+
+- CSV mode (default): reads/writes `data/students.csv` and `data/lessons.csv`.
+- Database mode: enabled when `DATABASE_URL` is set.
+
+When `DATABASE_URL` exists, students and lessons are stored in SQL tables and the
+upload flow writes validated CSV data directly to the database.
+
+For Railway PostgreSQL:
+
+1. Create a PostgreSQL service in Railway.
+2. Copy `DATABASE_URL` from the PostgreSQL service variables.
+3. Set `DATABASE_URL` in your web app environment (Vercel or Railway service).
+4. Redeploy the app.
+
+Notes:
+
+- If your URL starts with `postgres://`, the app auto-normalizes it.
+- Tables are created automatically on startup.
+
 ---
 
 ## Data model
