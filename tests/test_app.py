@@ -30,6 +30,15 @@ def test_health_returns_ok():
     assert response.get_data(as_text=True) == "ok"
 
 
+def test_health_db_csv_mode():
+    client = web_app.app.test_client()
+    response = client.get("/health/db")
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["configured"] is False
+    assert payload["mode"] == "csv"
+
+
 def test_login_success_sets_session(monkeypatch, tmp_path):
     monkeypatch.setattr(web_app, "ADMIN_PASSWORD", "testpass")
     monkeypatch.setattr(web_app, "DATA_DIR", tmp_path / "data")

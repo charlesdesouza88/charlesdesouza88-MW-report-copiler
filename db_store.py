@@ -1,7 +1,7 @@
 import json
 from contextlib import contextmanager
 
-from sqlalchemy import Integer, Text, create_engine, select
+from sqlalchemy import Integer, Text, create_engine, select, text
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, sessionmaker
 
 
@@ -34,6 +34,10 @@ class DatabaseStore:
 
     def initialize(self):
         Base.metadata.create_all(self.engine)
+
+    def check_connection(self):
+        with self.engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
 
     @contextmanager
     def session(self):

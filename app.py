@@ -4,6 +4,7 @@
 import csv
 import functools
 import io
+import json
 import logging
 import os
 import zipfile
@@ -75,6 +76,49 @@ if DB_ENABLED:
         DB_ENABLED = False
 elif DATABASE_URL and DB_IMPORT_ERROR is not None:
     logger.error('DATABASE_URL is set but database dependencies failed to import: %s', DB_IMPORT_ERROR)
+
+DB_STARTUP_ERROR = None
+if DATABASE_URL and not db_store:
+    DB_STARTUP_ERROR = 'Database URL is set but connection failed at startup (see server logs).'
+
+
+def _database_status():
+    """Return connection diagnostics for /health/db and the dashboard."""
+    if not DATABASE_URL:
+        return {
+            'configured': False,
+            'connected': False,
+            'mode': 'csv',
+            'message': 'DATABASE_URL not set — using CSV files.',
+        }
+    if db_store is None:
+        return {
+            'configured': True,
+            'connected': False,
+            'mode': 'csv-fallback',
+            'message': DB_STARTUP_ERROR or 'Database unavailable; using CSV fallback.',
+        }
+    try:
+        db_store.check_connection()
+        students = db_store.load_students()
+        lessons = db_store.load_lessons()
+        return {
+            'configured': True,
+            'connected': True,
+            'mode': 'postgresql',
+            'message': 'Connected to PostgreSQL.',
+            'student_rows': len(students),
+            'lesson_rows': len(lessons),
+        }
+    except Exception as exc:
+        logger.exception('Database health check failed: %s', exc)
+        return {
+            'configured': True,
+            'connected': False,
+            'mode': 'postgresql',
+            'message': f'Database ping failed: {exc}',
+        }
+
 
 default_data_dir = str(BASE / 'data')
 default_out_dir = str(BASE / 'output')
@@ -282,6 +326,14 @@ def health():
     return 'ok', 200
 
 
+@app.route('/health/db')
+def health_db():
+    """Database connectivity check (JSON). No auth — for Railway / ops."""
+    status = _database_status()
+    code = 200 if status.get('connected') or not status.get('configured') else 503
+    return json.dumps(status, ensure_ascii=False), code, {'Content-Type': 'application/json'}
+
+
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     error = None
@@ -314,6 +366,7 @@ def dashboard():
     else:
         lessons_path = DATA_DIR / 'lessons.csv'
         data_ready = (DATA_DIR / 'students.csv').exists() and lessons_path.exists()
+    db_status = _database_status()
     return render_template('dashboard.html',
         student_count=len(students),
         turma_count=len(turmas),
@@ -321,6 +374,7 @@ def dashboard():
         report_count=len(individual),
         turmas=list(turmas.keys()),
         data_ready=data_ready,
+        db_status=db_status,
     )
 
 

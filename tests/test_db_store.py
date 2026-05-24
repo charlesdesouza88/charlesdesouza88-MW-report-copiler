@@ -19,3 +19,5 @@ def test_database_store_round_trip(tmp_path):
 
     assert store.load_students() == students
     assert store.load_lessons() == lessons
+
+    store.check_connection()

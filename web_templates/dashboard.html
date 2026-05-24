@@ -12,6 +12,23 @@
 
 {% block content %}
 
+{% if db_status.configured %}
+<div class="alert {% if db_status.connected %}alert-success{% else %}alert-warning{% endif %}" style="margin-bottom:16px;">
+  {% if db_status.connected %}
+  ✓ Banco de dados: {{ db_status.message }}
+  {% if db_status.student_rows is defined %}
+  ({{ db_status.student_rows }} alunos, {{ db_status.lesson_rows }} aulas)
+  {% endif %}
+  {% else %}
+  ⚠ {{ db_status.message }}
+  {% endif %}
+</div>
+{% else %}
+<div class="alert alert-info" style="margin-bottom:16px;">
+  ℹ Armazenamento: arquivos CSV (defina <code>DATABASE_URL</code> no Railway para usar PostgreSQL).
+</div>
+{% endif %}
+
 <div class="stat-grid">
   <div class="stat-card">
     <div class="stat-label">Alunos</div>
