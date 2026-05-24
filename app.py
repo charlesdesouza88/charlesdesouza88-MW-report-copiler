@@ -54,13 +54,12 @@ DATABASE_URL = os.environ.get('DATABASE_URL', '').strip()
 DB_ENABLED = bool(DATABASE_URL)
 db_store = None
 if DB_ENABLED:
-    
+    from db_store import DatabaseStore
     db_store = DatabaseStore(DATABASE_URL)
-db_store.initialize()
+    db_store.initialize()
 
-'/tmp/mw/data'
-    default_data_dir = str(BASE / 'data')
-    default_out_dir = str(BASE / 'output')
+default_data_dir = str(BASE / 'data')
+default_out_dir = str(BASE / 'output')
 
 TMPL_DIR = BASE / 'templates'
 DATA_DIR = _ensure_writable_dir(
@@ -383,7 +382,7 @@ def upload():
                     errors.append(f'Erro ao salvar {label}: {exc}')
     if db_store:
         students_exists = bool(_load_students())
-        lessons_exists OS=rr_road_lessons())
+        lessons_exists = bool(_load_lessons())
     else:
         students_exists = (DATA_DIR / 'students.csv').exists()
         lessons_exists = (DATA_DIR / 'lessons.csv').exists()
