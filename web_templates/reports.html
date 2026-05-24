@@ -41,7 +41,7 @@
         <td><strong>{{ f.stem.replace('_', ' ') }}</strong></td>
         <td><span class="tag">{{ parts[0] }}</span></td>
         <td>
-          <div class="flex gap-8" style="justify-content:flex-end;">
+          <div class="report-actions">
             <a href="{{ url_for('preview', filename=f.name) }}" target="_blank" class="btn btn-ghost btn-xs">👁 Visualizar</a>
             <a href="{{ url_for('preview', filename=f.name) }}" target="_blank"
                onclick="openPrint(event, '{{ url_for('preview', filename=f.name) }}')"
@@ -72,7 +72,7 @@
       <tr>
         <td><strong><span class="tag" style="margin-right:8px;">{{ turma }}</span> Diagnóstico de turma</strong></td>
         <td>
-          <div class="flex gap-8" style="justify-content:flex-end;">
+          <div class="report-actions">
             <a href="{{ url_for('preview', filename=f.name) }}" target="_blank" class="btn btn-ghost btn-xs">👁 Visualizar</a>
             <a href="{{ url_for('preview', filename=f.name) }}" target="_blank"
                onclick="openPrint(event, '{{ url_for('preview', filename=f.name) }}')"

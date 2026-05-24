@@ -9,7 +9,7 @@
 {% block content %}
 
 {% if turmas %}
-<div class="flex gap-8 mb-16" id="turma-filter">
+<div class="filter-scroll mb-16" id="turma-filter">
   <button class="btn btn-sm btn-primary filter-btn" data-turma="">Todos</button>
   {% for t in turmas %}
   <button class="btn btn-sm btn-ghost filter-btn" data-turma="{{ t }}">{{ t }}</button>
@@ -18,7 +18,39 @@
 {% endif %}
 
 {% if students %}
-<div class="table-wrap">
+<div class="students-cards-view">
+  {% for s in students %}
+  <div class="student-card student-card-item" data-turma="{{ s.turma }}">
+    <div class="student-card-header">
+      <div>
+        <strong style="font-size:15px;">{{ s.student_name }}</strong>
+        <div class="font-sm text-gray" style="margin-top:4px;">{{ s.nivel or '—' }}</div>
+      </div>
+      <span class="tag">{{ s.turma }}</span>
+    </div>
+    <div class="student-card-scores">
+      <div class="student-card-score"><span class="font-sm text-gray">Fala</span><strong>{{ s.speaking or '—' }}</strong></div>
+      <div class="student-card-score"><span class="font-sm text-gray">Audio</span><strong>{{ s.listening or '—' }}</strong></div>
+      <div class="student-card-score"><span class="font-sm text-gray">Escrita</span><strong>{{ s.writing or '—' }}</strong></div>
+      <div class="student-card-score"><span class="font-sm text-gray">Leitura</span><strong>{{ s.reading or '—' }}</strong></div>
+      <div class="student-card-score"><span class="font-sm text-gray">Gram.</span><strong>{{ s.gramatica or '—' }}</strong></div>
+      <div class="student-card-score"><span class="font-sm text-gray">Faltas</span><strong>{{ s.faltas or '0' }}</strong></div>
+      {% if s.aula_extra %}
+      <span class="tag tag-orange">{{ s.aula_extra }}</span>
+      {% endif %}
+    </div>
+    <div class="student-card-actions">
+      <a href="{{ url_for('student_edit', idx=loop.index0) }}" class="btn btn-ghost btn-sm">Editar</a>
+      <form method="post" action="{{ url_for('student_delete', idx=loop.index0) }}"
+            onsubmit="return confirm('Excluir {{ s.student_name }}?')">
+        <button type="submit" class="btn btn-danger btn-sm">Excluir</button>
+      </form>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<div class="table-wrap students-table-view">
   <table>
     <thead>
       <tr>
@@ -88,7 +120,7 @@ document.querySelectorAll('.filter-btn').forEach(btn => {
       b.className = 'btn btn-sm btn-ghost filter-btn';
     });
     btn.className = 'btn btn-sm btn-primary filter-btn';
-    document.querySelectorAll('.student-row').forEach(row => {
+    document.querySelectorAll('.student-row, .student-card-item').forEach(row => {
       row.style.display = (!turma || row.dataset.turma === turma) ? '' : 'none';
     });
   });

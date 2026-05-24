@@ -2,6 +2,7 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>{{ turma_display }} — Diagnóstico de Turma</title>
 <style>
 @page { size: A4 landscape; margin: 8mm; }
@@ -124,6 +125,24 @@ body {
 .date-slot { border: 1px solid #CCC; padding: 3px 6px; font-size: 9px; text-align: center; margin-bottom: 3px; color: #999; }
 .extra-notes { border: 2px solid #5B2D8E; border-radius: 8px; padding: 8px; font-size: 10px; }
 .extra-notes-title { font-weight: 700; color: #5B2D8E; margin-bottom: 3px; }
+
+@media screen {
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    padding: 12px;
+    background: #E8E4EE;
+  }
+  .skill-cards { flex-direction: column; }
+  .skill-card { width: 100%; max-width: 100%; }
+  .dates-grid { grid-template-columns: 1fr; }
+  .profile-table, .dev-table { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+}
+@media print {
+  body { width: 277mm; background: #fff; padding: 0; }
+}
 </style>
 </head>
 <body>

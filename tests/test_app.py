@@ -152,6 +152,59 @@ def test_upload_template_students_download(monkeypatch, tmp_path):
     assert b"teacher,turma,turma_display" in response.data
 
 
+def test_login_page_has_viewport(monkeypatch, tmp_path):
+    monkeypatch.setattr(web_app, "DATA_DIR", tmp_path / "data")
+    monkeypatch.setattr(web_app, "OUT_DIR", tmp_path / "output")
+
+    client = web_app.app.test_client()
+    response = client.get("/login")
+
+    assert response.status_code == 200
+    html = response.get_data(as_text=True)
+    assert 'name="viewport"' in html
+    assert "width=device-width" in html
+
+
+def test_authenticated_shell_has_drawer_markup(monkeypatch, tmp_path):
+    monkeypatch.setattr(web_app, "ADMIN_PASSWORD", "testpass")
+    monkeypatch.setattr(web_app, "DATA_DIR", tmp_path / "data")
+    monkeypatch.setattr(web_app, "OUT_DIR", tmp_path / "output")
+    web_app.DATA_DIR.mkdir()
+    web_app.OUT_DIR.mkdir()
+
+    client = web_app.app.test_client()
+    _login(client)
+    response = client.get("/")
+
+    assert response.status_code == 200
+    html = response.get_data(as_text=True)
+    assert 'name="viewport"' in html
+    assert 'id="menu-toggle"' in html
+    assert 'id="nav-backdrop"' in html
+    assert 'class="students-cards-view"' not in html
+
+
+def test_students_page_has_dual_view_markup(monkeypatch, tmp_path):
+    data_dir = tmp_path / "data"
+    data_dir.mkdir()
+    (data_dir / "students.csv").write_text(_students_csv(), encoding="utf-8")
+
+    monkeypatch.setattr(web_app, "ADMIN_PASSWORD", "testpass")
+    monkeypatch.setattr(web_app, "DATA_DIR", data_dir)
+    monkeypatch.setattr(web_app, "OUT_DIR", tmp_path / "output")
+    web_app.OUT_DIR.mkdir()
+
+    client = web_app.app.test_client()
+    _login(client)
+    response = client.get("/students")
+
+    assert response.status_code == 200
+    html = response.get_data(as_text=True)
+    assert "students-table-view" in html
+    assert "students-cards-view" in html
+    assert "student-card-item" in html
+
+
 def test_upload_template_lessons_download(monkeypatch, tmp_path):
     monkeypatch.setattr(web_app, "ADMIN_PASSWORD", "testpass")
     monkeypatch.setattr(web_app, "DATA_DIR", tmp_path / "data")
