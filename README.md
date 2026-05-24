@@ -19,7 +19,9 @@ All outputs are self-contained HTML — open in any browser and **Print → Save
 
 ## Tech stack
 
-- **Python 3.8+** — no web server, no database
+- **Python 3.8+** — CLI report compiler; optional Flask web dashboard
+- **Flask + Gunicorn** — teacher dashboard (deployed on Railway)
+- **PostgreSQL** (optional) — persistent student/lesson data via SQLAlchemy
 - **Jinja2** — HTML templating
 - **Inline SVG** — radar/pentagon charts and attendance pie charts (no JS, no external charting libs)
 - **CSS `@page`** — A4 landscape print layout
@@ -32,13 +34,12 @@ All outputs are self-contained HTML — open in any browser and **Print → Save
 ```
 mister-wiz-report-compiler/
 ├── compiler.py              # Main script — reads CSVs, renders templates, writes output/
-├── requirements.txt         # jinja2, pytest
-├── templates/
-│   ├── individual_report.html   # Jinja2 template: per-student report card
-│   └── class_diagnostic.html   # Jinja2 template: per-class diagnostic
-├── data/
-│   ├── students.csv         # One row per student (scores, feedback, attendance)
-│   └── lessons.csv          # One row per lesson (date, content, activities)
+├── app.py                   # Flask web dashboard
+├── railway.json             # Railway deploy config (gunicorn)
+├── requirements.txt
+├── templates/               # Report HTML (Jinja2)
+├── web_templates/           # Dashboard HTML (Flask)
+├── data/                    # Sample / local CSV data
 └── output/                  # Generated HTML files (git-ignored)
 ```
 
@@ -88,7 +89,7 @@ For Railway PostgreSQL:
 
 1. Create a PostgreSQL service in Railway.
 2. Copy `DATABASE_URL` from the PostgreSQL service variables.
-3. Set `DATABASE_URL` in your web app environment (Vercel or Railway service).
+3. Set `DATABASE_URL` on your Railway web service (Variables → reference the Postgres service).
 4. Redeploy the app.
 
 Notes:
@@ -228,38 +229,57 @@ No code changes needed.
 
 ---
 
-## Go live on Vercel
+## Go live on Railway
 
-This repository is configured for Vercel with:
+Production hosting uses **Railway** (`railway.json` runs `gunicorn` on the Flask app).
 
-- `api/index.py` (Vercel Python function entrypoint)
-- `vercel.json` (rewrites all routes to the Flask app entrypoint)
+### 1. Create the project
 
-Deploy steps:
+1. Push this repo to GitHub.
+2. In [Railway](https://railway.app), **New Project → Deploy from GitHub repo** and select this repository.
+3. Railway uses `railway.json` for the start command and health check (`/login`).
 
-1. Push this branch to GitHub.
-2. In Vercel, import the repository as a new project.
-3. Set environment variables:
-  - `ADMIN_PASSWORD` (required)
-  - `SECRET_KEY` (required)
-4. Deploy. Vercel automatically assigns a public domain like `https://<project>.vercel.app`.
+### 2. Environment variables
 
-Notes:
+On the **web service**, set:
 
-- On Vercel, the app defaults `DATA_DIR` and `OUT_DIR` to `/tmp/mw/data` and `/tmp/mw/output`.
-- `/tmp` is writable but ephemeral in serverless environments, so uploaded CSVs and generated reports are temporary.
-- For persistent storage, use external storage (for example, Vercel Blob, S3, or a database-backed approach).
+| Variable | Required | Notes |
+|---|---|---|
+| `ADMIN_PASSWORD` | Yes | Dashboard login password |
+| `SECRET_KEY` | Yes | Long random string for Flask sessions |
+| `DATABASE_URL` | Recommended | From a Railway PostgreSQL service |
+| `DATA_DIR` | Optional | Path on a mounted volume for CSV files |
+| `OUT_DIR` | Optional | Path on a mounted volume for generated reports |
 
-Recommended post-deploy checks:
+Copy `.env.example` for local development.
 
-1. Log in at `/login` with `ADMIN_PASSWORD`.
-2. Upload both CSV files from the Upload page.
-3. Generate reports and confirm preview/download routes work.
+### 3. PostgreSQL (recommended)
+
+1. In the same Railway project, add **PostgreSQL**.
+2. On the web service, add a variable reference: `DATABASE_URL` → Postgres `DATABASE_URL`.
+3. Redeploy. Tables are created automatically on startup.
+
+With `DATABASE_URL` set, uploads and student edits persist in the database.
+
+### 4. Persistent files (optional)
+
+For CSV-on-disk mode or keeping generated HTML between deploys:
+
+1. Add a **Volume** to the web service (e.g. mount at `/data`).
+2. Set `DATA_DIR=/data/mw/data` and `OUT_DIR=/data/mw/output`.
+3. Redeploy.
+
+Without a volume, the app still works locally and on Railway using `data/` and `output/` inside the container (data resets on redeploy unless you use the database).
+
+### 5. Post-deploy checks
+
+1. Open the Railway public URL → `/login` with `ADMIN_PASSWORD`.
+2. Upload `students.csv` and `lessons.csv` (or use DB mode after Postgres is linked).
+3. **Generate** reports and confirm preview/download work.
 
 ## Planned extensions
 
 - **Google Sheets sync** — read `students.csv` / `lessons.csv` directly from a shared Google Sheet via the Sheets API
 - **PDF export** — add WeasyPrint or Puppeteer to generate PDFs server-side (no browser printing needed)
-- **Web UI** — simple Flask/FastAPI form where teachers fill in scores and download reports instantly
 - **Multi-language support** — English/Portuguese toggle on report templates
 - **Period comparison** — track score deltas between reporting periods per student

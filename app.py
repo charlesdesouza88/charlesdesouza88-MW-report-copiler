@@ -76,12 +76,8 @@ if DB_ENABLED:
 elif DATABASE_URL and DB_IMPORT_ERROR is not None:
     logger.error('DATABASE_URL is set but database dependencies failed to import: %s', DB_IMPORT_ERROR)
 
-if os.environ.get('VERCEL'):
-    default_data_dir = '/tmp/mw/data'
-    default_out_dir = '/tmp/mw/output'
-else:
-    default_data_dir = str(BASE / 'data')
-    default_out_dir = str(BASE / 'output')
+default_data_dir = str(BASE / 'data')
+default_out_dir = str(BASE / 'output')
 
 TMPL_DIR = BASE / 'templates'
 DATA_DIR = _ensure_writable_dir(
