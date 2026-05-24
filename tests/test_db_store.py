@@ -7,6 +7,14 @@ def test_prepare_database_url_adds_ssl_for_postgres():
     assert "sslmode=require" in url
 
 
+def test_prepare_database_url_strips_prepended_db_name():
+    broken = (
+        "railwaypostgresql://postgres:pass@postgres.railway.internal:5432/railway"
+    )
+    url = prepare_database_url(broken)
+    assert url.startswith("postgresql+psycopg2://postgres:pass@postgres.railway.internal:5432/railway")
+
+
 def test_prepare_database_url_leaves_sqlite_untouched():
     url = "sqlite:////tmp/test.db"
     assert prepare_database_url(url) == url

@@ -4,6 +4,7 @@ from contextlib import contextmanager
 from urllib.parse import urlparse
 
 from sqlalchemy import Integer, Text, create_engine, select, text
+from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, sessionmaker
 
 logger = logging.getLogger(__name__)
 
@@ -13,6 +14,12 @@ def prepare_database_url(database_url: str) -> str:
     url = database_url.strip()
     if not url:
         return url
+
+    # Fix misconfigured Railway vars that prepend the DB name to the URL.
+    if "postgresql://" in url and not url.startswith("postgresql"):
+        url = url[url.index("postgresql://") :]
+    elif "postgres://" in url and not url.startswith("postgres"):
+        url = url[url.index("postgres://") :]
 
     if url.startswith("postgres://"):
         url = "postgresql+psycopg2://" + url[len("postgres://") :]
@@ -25,7 +32,6 @@ def prepare_database_url(database_url: str) -> str:
         url = f"{url}{sep}sslmode=require"
 
     return url
-from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, sessionmaker
 
 
 class Base(DeclarativeBase):
