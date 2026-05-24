@@ -1,4 +1,15 @@
-from db_store import DatabaseStore
+from db_store import DatabaseStore, prepare_database_url
+
+
+def test_prepare_database_url_adds_ssl_for_postgres():
+    url = prepare_database_url("postgres://user:pass@containers.railway.app:5432/railway")
+    assert url.startswith("postgresql+psycopg2://")
+    assert "sslmode=require" in url
+
+
+def test_prepare_database_url_leaves_sqlite_untouched():
+    url = "sqlite:////tmp/test.db"
+    assert prepare_database_url(url) == url
 
 
 def test_database_store_round_trip(tmp_path):

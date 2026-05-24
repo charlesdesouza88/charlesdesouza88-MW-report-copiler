@@ -7,6 +7,7 @@ import io
 import json
 import logging
 import os
+import time
 import zipfile
 from pathlib import Path
 
@@ -64,22 +65,33 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 DATABASE_URL = os.environ.get('DATABASE_URL', '').strip()
+if not DATABASE_URL:
+    DATABASE_URL = os.environ.get('DATABASE_PRIVATE_URL', '').strip()
 DB_ENABLED = bool(DATABASE_URL) and DatabaseStore is not None
 db_store = None
+DB_STARTUP_ERROR = None
 if DB_ENABLED:
-    try:
-        db_store = DatabaseStore(DATABASE_URL)
-        db_store.initialize()
-    except Exception as exc:
-        logger.exception('Database startup failed; falling back to CSV mode: %s', exc)
+    last_exc = None
+    for attempt in range(1, 4):
+        try:
+            db_store = DatabaseStore(DATABASE_URL)
+            db_store.initialize()
+            last_exc = None
+            logger.info('Database connected on attempt %s', attempt)
+            break
+        except Exception as exc:
+            last_exc = exc
+            logger.warning('Database startup attempt %s failed: %s', attempt, exc)
+            if attempt < 3:
+                time.sleep(2)
+    if last_exc is not None:
+        logger.exception('Database startup failed; falling back to CSV mode')
         db_store = None
         DB_ENABLED = False
+        DB_STARTUP_ERROR = str(last_exc)
 elif DATABASE_URL and DB_IMPORT_ERROR is not None:
     logger.error('DATABASE_URL is set but database dependencies failed to import: %s', DB_IMPORT_ERROR)
-
-DB_STARTUP_ERROR = None
-if DATABASE_URL and not db_store:
-    DB_STARTUP_ERROR = 'Database URL is set but connection failed at startup (see server logs).'
+    DB_STARTUP_ERROR = f'Database dependencies failed to import: {DB_IMPORT_ERROR}'
 
 
 def _database_status():

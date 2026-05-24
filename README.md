@@ -94,8 +94,10 @@ For Railway PostgreSQL:
 
 Notes:
 
-- If your URL starts with `postgres://`, the app auto-normalizes it.
+- If your URL starts with `postgres://`, the app auto-normalizes it and adds `sslmode=require` (required on Railway).
+- On the **web service**, reference Postgres `DATABASE_URL` (private URL), not the public proxy URL unless you know you need it.
 - Tables are created automatically on startup.
+- After deploy, open `/health/db` — `connected` should be `true`.
 
 ---
 
