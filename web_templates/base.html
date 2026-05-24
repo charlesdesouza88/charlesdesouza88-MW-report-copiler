@@ -17,6 +17,7 @@
   --font: Arial, Helvetica, sans-serif;
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { max-width: 100%; overflow-x: hidden; }
 body { font-family: var(--font); background: #F4F2F8; color: var(--text); min-height: 100vh; }
 
 /* ── Sidebar ── */
@@ -187,12 +188,17 @@ textarea { min-height: 58px; resize: vertical; }
 
 /* ── Mobile shell ── */
 .mobile-bar {
-  display: none; align-items: center; gap: 12px;
+  display: none; align-items: center; gap: 10px; flex-wrap: wrap;
   width: 100%; flex-shrink: 0;
-  padding: 12px 16px; padding-top: max(12px, env(safe-area-inset-top));
+  padding: 10px 12px; padding-top: max(10px, env(safe-area-inset-top));
   background: var(--purple-dk); color: #fff;
-  position: sticky; top: 0; z-index: 20;
+  position: sticky; top: 0; z-index: 40;
 }
+.mobile-actions {
+  display: none; align-items: center; gap: 8px; flex-wrap: wrap;
+  margin-left: auto;
+}
+.mobile-actions .btn { white-space: nowrap; }
 .menu-toggle {
   width: 44px; height: 44px; border: none; border-radius: 8px;
   background: rgba(255,255,255,0.12); color: #fff; font-size: 20px;
@@ -212,24 +218,36 @@ body.nav-open .nav-backdrop { display: block; }
 
 @media (max-width: 1023px) {
   .sidebar {
+    display: none;
+    position: fixed;
+    top: 0; left: 0; bottom: 0;
+    width: min(280px, 86vw);
     transform: translateX(-100%);
     transition: transform 0.2s ease;
-    z-index: 30;
-    visibility: hidden;
+    z-index: 50;
   }
   body.nav-open .sidebar {
+    display: flex;
     transform: translateX(0);
-    visibility: visible;
   }
-  .main { margin-left: 0; width: 100%; max-width: 100%; }
-  .mobile-bar { display: flex; }
-  .topbar .page-title { display: none; }
-  .topbar {
-    padding: 12px 16px; flex-wrap: wrap; gap: 10px;
-    padding-left: max(16px, env(safe-area-inset-left));
-    padding-right: max(16px, env(safe-area-inset-right));
+  .main {
+    margin-left: 0;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
   }
-  .topbar .flex.gap-8 { width: 100%; flex-wrap: wrap; }
+  .mobile-bar {
+    display: flex;
+    position: sticky;
+    top: 0;
+    left: 0;
+    right: 0;
+    width: 100%;
+    max-width: 100vw;
+    z-index: 40;
+  }
+  .mobile-actions { display: flex; }
+  .topbar { display: none; }
   .content {
     padding: 16px;
     padding-left: max(16px, env(safe-area-inset-left));
@@ -238,8 +256,11 @@ body.nav-open .nav-backdrop { display: block; }
   }
 }
 
-@media (max-width: 639px) {
+@media (max-width: 767px) {
   .stat-grid { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 639px) {
   .layout-2col, .upload-hero-inner { grid-template-columns: 1fr; }
   .form-grid-2, .form-grid-3 { grid-template-columns: 1fr; }
   .score-row { flex-direction: column; align-items: flex-start; }
@@ -300,15 +321,18 @@ body.nav-open .nav-backdrop { display: block; }
   <header class="mobile-bar">
     <button type="button" class="menu-toggle" id="menu-toggle" aria-label="Abrir menu" aria-expanded="false">☰</button>
     <div class="mobile-title">{{ self.page_title() }}</div>
+    <div class="mobile-actions">{{ self.topbar_actions() }}</div>
   </header>
   <div class="topbar">
     <div class="page-title">{{ self.page_title() }}</div>
-    <div class="flex gap-8">{% block topbar_actions %}{% endblock %}</div>
+    <div class="flex gap-8">{{ self.topbar_actions() }}</div>
   </div>
   <div class="content">
     {% block content %}{% endblock %}
   </div>
 </div>
+
+{% block topbar_actions %}{% endblock %}
 
 <script>
 (function () {
