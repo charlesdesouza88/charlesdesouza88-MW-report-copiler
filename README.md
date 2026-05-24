@@ -237,7 +237,7 @@ Production hosting uses **Railway** (`railway.json` runs `gunicorn` on the Flask
 
 1. Push this repo to GitHub.
 2. In [Railway](https://railway.app), **New Project → Deploy from GitHub repo** and select this repository.
-3. Railway uses `railway.json` for the start command and health check (`/login`).
+3. Railway uses `railway.json` for the start command and health check (`/health`).
 
 ### 2. Environment variables
 
@@ -270,6 +270,16 @@ For CSV-on-disk mode or keeping generated HTML between deploys:
 3. Redeploy.
 
 Without a volume, the app still works locally and on Railway using `data/` and `output/` inside the container (data resets on redeploy unless you use the database).
+
+### MCP in Cursor (optional)
+
+This repo includes `.cursor/mcp.json` for the [Railway remote MCP](https://docs.railway.com/ai/remote-mcp-server) (`https://mcp.railway.com`).
+
+1. Reload Cursor MCP servers (or restart Cursor).
+2. Approve Railway access in the browser when prompted.
+3. You can then ask the agent to list projects, services, variables, and logs.
+
+CLI alternative: `npx -y @railway/cli login` then `railway link` in this directory.
 
 ### 5. Post-deploy checks
 

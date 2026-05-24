@@ -23,6 +23,13 @@ def _login(client):
     return client.post("/login", data={"password": "testpass"}, follow_redirects=False)
 
 
+def test_health_returns_ok():
+    client = web_app.app.test_client()
+    response = client.get("/health")
+    assert response.status_code == 200
+    assert response.get_data(as_text=True) == "ok"
+
+
 def test_login_success_sets_session(monkeypatch, tmp_path):
     monkeypatch.setattr(web_app, "ADMIN_PASSWORD", "testpass")
     monkeypatch.setattr(web_app, "DATA_DIR", tmp_path / "data")

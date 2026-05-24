@@ -276,6 +276,12 @@ def _csv_rows_from_text(text):
 
 # ── Auth ─────────────────────────────────────────────────────────────────────────────
 
+@app.route('/health')
+def health():
+    """Railway healthcheck — no auth, always 200 when the app is up."""
+    return 'ok', 200
+
+
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     error = None
