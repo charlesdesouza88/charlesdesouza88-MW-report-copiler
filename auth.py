@@ -218,6 +218,72 @@ class UserStore:
             logger.info('Superadmin password synced for %s', key)
         return updated
 
+    def apply_env_superadmin(self, email, password):
+        """
+        Ensure SUPERADMIN_EMAIL exists as an active superadmin with SUPERADMIN_PASSWORD.
+        Runs on every deploy so Railway env vars stay the source of truth.
+        """
+        if not email or not password:
+            return False
+
+        users = self.list_users()
+        key = normalize_email(email)
+        password_hash = generate_password_hash(password)
+
+        for user in users:
+            if normalize_email(user.get('email')) == key:
+                user['role'] = ROLE_SUPERADMIN
+                user['password_hash'] = password_hash
+                user['active'] = True
+                user['teacher_name'] = user.get('teacher_name') or ''
+                self._save_all(users)
+                logger.info('Superadmin reconciled for existing account %s', key)
+                return True
+
+        supers = [
+            u for u in users
+            if u.get('role') == ROLE_SUPERADMIN and u.get('active', True)
+        ]
+        if len(supers) == 1:
+            supers[0]['email'] = key
+            supers[0]['password_hash'] = password_hash
+            supers[0]['active'] = True
+            self._save_all(users)
+            logger.info('Superadmin email migrated to %s', key)
+            return True
+
+        if not self._has_superadmin(users):
+            return self.ensure_bootstrap_superadmin(email, password)
+
+        logger.warning(
+            'Multiple superadmins in database; could not apply SUPERADMIN_EMAIL=%s',
+            key,
+        )
+        return False
+
+    def auth_status(self, bootstrap_email=''):
+        """Diagnostics for /health/auth (no secrets)."""
+        users = self.list_users()
+        key = normalize_email(bootstrap_email) if bootstrap_email else ''
+        return {
+            'user_count': len(users),
+            'superadmin_count': sum(
+                1 for u in users if u.get('role') == ROLE_SUPERADMIN and u.get('active', True)
+            ),
+            'bootstrap_email_configured': bool(key),
+            'bootstrap_email_registered': bool(
+                key and any(normalize_email(u.get('email')) == key for u in users)
+            ),
+            'accounts': [
+                {
+                    'email': u.get('email', ''),
+                    'role': u.get('role', ''),
+                    'active': bool(u.get('active', True)),
+                }
+                for u in users
+            ],
+        }
+
     def create_teacher(self, email, password, teacher_name):
         users = self.list_users()
         if self.get_by_email(email):

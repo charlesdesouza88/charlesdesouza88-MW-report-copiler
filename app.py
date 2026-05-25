@@ -164,7 +164,8 @@ SUPERADMIN_SYNC_PASSWORD = os.environ.get('SUPERADMIN_SYNC_PASSWORD', '').lower(
 
 
 def _bootstrap_auth_accounts():
-    user_store.ensure_bootstrap_superadmin(SUPERADMIN_EMAIL, SUPERADMIN_PASSWORD)
+    """Keep PostgreSQL/JSON users aligned with SUPERADMIN_EMAIL + SUPERADMIN_PASSWORD."""
+    user_store.apply_env_superadmin(SUPERADMIN_EMAIL, SUPERADMIN_PASSWORD)
     if SUPERADMIN_SYNC_PASSWORD:
         user_store.sync_superadmin_password(SUPERADMIN_EMAIL, SUPERADMIN_PASSWORD)
 
@@ -575,6 +576,16 @@ def health_db():
     return json.dumps(status, ensure_ascii=False), code, {'Content-Type': 'application/json'}
 
 
+@app.route('/health/auth')
+def health_auth():
+    """Auth diagnostics (JSON). No secrets — for Railway / ops."""
+    status = user_store.auth_status(SUPERADMIN_EMAIL)
+    status['configured_email'] = SUPERADMIN_EMAIL or ''
+    status['password_configured'] = bool(SUPERADMIN_PASSWORD)
+    status['storage'] = 'postgresql' if db_store else 'json'
+    return json.dumps(status, ensure_ascii=False), 200, {'Content-Type': 'application/json'}
+
+
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     error = None
@@ -582,8 +593,8 @@ def login():
     bootstrap_email = SUPERADMIN_EMAIL or 'admin@misterwiz.local'
 
     if request.method == 'POST':
-        email = request.form.get('email', '')
-        password = request.form.get('password', '')
+        email = (request.form.get('email') or '').strip()
+        password = request.form.get('password') or ''
         user = user_store.authenticate(email, password)
         if user:
             _login_session(user)
