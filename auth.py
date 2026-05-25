@@ -168,15 +168,29 @@ class UserStore:
             return None
         return user_public_dict(user)
 
+    def _has_superadmin(self, users):
+        return any(
+            u.get('role') == ROLE_SUPERADMIN and u.get('active', True)
+            for u in users
+        )
+
     def ensure_bootstrap_superadmin(self, email, password):
-        users = self.list_users()
-        if users:
-            return False
+        """Create the initial superadmin when none exists."""
         if not email or not password:
-            logger.warning('No users and bootstrap credentials missing — login disabled until configured.')
+            users = self.list_users()
+            if not users:
+                logger.warning(
+                    'No users and bootstrap credentials missing — set SUPERADMIN_EMAIL and SUPERADMIN_PASSWORD.',
+                )
             return False
+
+        users = self.list_users()
+        if self._has_superadmin(users):
+            return False
+
+        next_id = max((u.get('id', 0) for u in users), default=0) + 1
         users.append({
-            'id': 1,
+            'id': next_id,
             'email': normalize_email(email),
             'password_hash': generate_password_hash(password),
             'role': ROLE_SUPERADMIN,
@@ -186,6 +200,23 @@ class UserStore:
         self._save_all(users)
         logger.info('Bootstrap superadmin created for %s', normalize_email(email))
         return True
+
+    def sync_superadmin_password(self, email, password):
+        """Update superadmin password from env (recovery). Set SUPERADMIN_SYNC_PASSWORD=1."""
+        if not email or not password:
+            return False
+        users = self.list_users()
+        key = normalize_email(email)
+        updated = False
+        for user in users:
+            if user.get('role') == ROLE_SUPERADMIN and normalize_email(user.get('email')) == key:
+                user['password_hash'] = generate_password_hash(password)
+                user['active'] = True
+                updated = True
+        if updated:
+            self._save_all(users)
+            logger.info('Superadmin password synced for %s', key)
+        return updated
 
     def create_teacher(self, email, password, teacher_name):
         users = self.list_users()

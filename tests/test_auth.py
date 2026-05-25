@@ -83,3 +83,13 @@ def test_teacher_cannot_access_upload(monkeypatch, tmp_path):
 
 def test_teacher_turmas():
     assert teacher_turmas(_students(), 'Chuck') == {'MASTER'}
+
+
+def test_sync_superadmin_password(tmp_path):
+    store = UserStore(json_path=tmp_path / 'users.json')
+    store.initialize()
+    store.ensure_bootstrap_superadmin('boss@test.local', 'old-pass')
+    assert store.authenticate('boss@test.local', 'old-pass')
+    store.sync_superadmin_password('boss@test.local', 'new-pass')
+    assert store.authenticate('boss@test.local', 'new-pass') is not None
+    assert store.authenticate('boss@test.local', 'old-pass') is None

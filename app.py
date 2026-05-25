@@ -50,6 +50,12 @@ def _ensure_writable_dir(path, fallback):
 
 
 def _load_local_env():
+    try:
+        from dotenv import load_dotenv
+        load_dotenv(BASE / '.env')
+        return
+    except ImportError:
+        pass
     env_path = BASE / '.env'
     if not env_path.exists():
         return
@@ -152,6 +158,16 @@ app.secret_key = os.environ.get('SECRET_KEY', 'mw-dev-change-in-prod')
 ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', '')
 SUPERADMIN_EMAIL = os.environ.get('SUPERADMIN_EMAIL', 'admin@misterwiz.local').strip()
 SUPERADMIN_PASSWORD = os.environ.get('SUPERADMIN_PASSWORD', ADMIN_PASSWORD).strip()
+SUPERADMIN_SYNC_PASSWORD = os.environ.get('SUPERADMIN_SYNC_PASSWORD', '').lower() in (
+    '1', 'true', 'yes',
+)
+
+
+def _bootstrap_auth_accounts():
+    user_store.ensure_bootstrap_superadmin(SUPERADMIN_EMAIL, SUPERADMIN_PASSWORD)
+    if SUPERADMIN_SYNC_PASSWORD:
+        user_store.sync_superadmin_password(SUPERADMIN_EMAIL, SUPERADMIN_PASSWORD)
+
 
 user_store = UserStore(
     db_store=db_store,
@@ -159,7 +175,7 @@ user_store = UserStore(
 )
 try:
     user_store.initialize()
-    user_store.ensure_bootstrap_superadmin(SUPERADMIN_EMAIL, SUPERADMIN_PASSWORD)
+    _bootstrap_auth_accounts()
 except Exception as exc:
     logger.exception('User store initialization failed: %s', exc)
 
@@ -562,6 +578,9 @@ def health_db():
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     error = None
+    user_count = len(user_store.list_users())
+    bootstrap_email = SUPERADMIN_EMAIL or 'admin@misterwiz.local'
+
     if request.method == 'POST':
         email = request.form.get('email', '')
         password = request.form.get('password', '')
@@ -569,8 +588,33 @@ def login():
         if user:
             _login_session(user)
             return redirect(url_for('dashboard'))
-        error = 'E-mail ou senha incorretos.'
-    return render_template('login.html', error=error)
+        if user_count == 0:
+            error = (
+                'Nenhuma conta foi criada no servidor. Defina SUPERADMIN_EMAIL e '
+                'SUPERADMIN_PASSWORD nas variáveis de ambiente (Railway) e reinicie o app.'
+            )
+        elif not SUPERADMIN_PASSWORD and user_store.get_by_email(email) is None:
+            error = (
+                f'E-mail ou senha incorretos. Primeiro acesso do administrador: use '
+                f'{bootstrap_email} e a senha definida em SUPERADMIN_PASSWORD.'
+            )
+        else:
+            known = user_store.get_by_email(email)
+            if known and not known.get('active', True):
+                error = 'Esta conta está desativada. Peça a um administrador para reativá-la.'
+            elif known:
+                error = 'Senha incorreta para este e-mail.'
+            else:
+                error = (
+                    f'E-mail não cadastrado. Administrador: use {bootstrap_email}. '
+                    f'Professores: use o e-mail criado em Usuários.'
+                )
+    return render_template(
+        'login.html',
+        error=error,
+        bootstrap_email=bootstrap_email,
+        accounts_configured=user_count > 0,
+    )
 
 
 @app.route('/logout')
@@ -922,7 +966,27 @@ def download_all():
                      as_attachment=True, download_name='mister_wiz_reports.zip')
 
 
+def _pick_port(preferred):
+    """Use preferred port, or the next free one (macOS AirPlay often blocks 5000)."""
+    import socket
+
+    for candidate in range(preferred, preferred + 10):
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            try:
+                sock.bind(('0.0.0.0', candidate))
+            except OSError:
+                continue
+            return candidate
+    return preferred
+
+
 if __name__ == '__main__':
     debug = os.environ.get('FLASK_DEBUG', '').lower() in ('1', 'true', 'yes')
-    port = int(os.environ.get('PORT', '5000'))
+    preferred = int(os.environ.get('PORT', '5000'))
+    port = _pick_port(preferred)
+    if port != preferred:
+        logger.warning('Port %s is in use; starting on http://127.0.0.1:%s', preferred, port)
+    else:
+        logger.info('Starting on http://127.0.0.1:%s', port)
     app.run(debug=debug, host='0.0.0.0', port=port)

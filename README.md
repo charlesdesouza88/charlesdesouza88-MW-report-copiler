@@ -57,15 +57,31 @@ python compiler.py
 # -> output/ now contains all student reports and class diagnostics
 ```
 
-Web dashboard:
+Web dashboard (easiest local test):
+
+```bash
+cp .env.example .env
+# Edit .env: SUPERADMIN_EMAIL and SUPERADMIN_PASSWORD
+
+chmod +x scripts/dev.sh
+./scripts/dev.sh
+# Prints your login email and starts the server (uses 5001 if macOS blocks 5000)
+# Open the URL shown in the terminal, e.g. http://127.0.0.1:5001/login
+```
+
+Quick automated journey check (no browser):
+
+```bash
+.venv/bin/python scripts/smoke_journey.py
+```
+
+Manual alternative:
 
 ```bash
 python -m venv .venv
 . .venv/bin/activate
 pip install -r requirements.txt
-cp .env.example .env
 python app.py
-# -> open http://127.0.0.1:5000
 ```
 
 To run the test battery:
