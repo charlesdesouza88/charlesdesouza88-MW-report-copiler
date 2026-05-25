@@ -149,7 +149,9 @@ def test_upload_template_students_download(monkeypatch, tmp_path):
     assert response.status_code == 200
     assert "attachment;" in response.headers.get("Content-Disposition", "")
     assert "students_template.csv" in response.headers.get("Content-Disposition", "")
+    assert response.data.startswith(b"\xef\xbb\xbf")
     assert b"teacher,turma,turma_display" in response.data
+    assert b"Jane Doe" in response.data
 
 
 def test_login_page_has_viewport(monkeypatch, tmp_path):
@@ -205,6 +207,25 @@ def test_students_page_has_dual_view_markup(monkeypatch, tmp_path):
     assert "student-card-item" in html
 
 
+def test_upload_page_shows_csv_template_preview(monkeypatch, tmp_path):
+    monkeypatch.setattr(web_app, "ADMIN_PASSWORD", "testpass")
+    monkeypatch.setattr(web_app, "DATA_DIR", tmp_path / "data")
+    monkeypatch.setattr(web_app, "OUT_DIR", tmp_path / "output")
+    web_app.DATA_DIR.mkdir()
+    web_app.OUT_DIR.mkdir()
+
+    client = web_app.app.test_client()
+    _login(client)
+    response = client.get("/upload")
+
+    assert response.status_code == 200
+    html = response.get_data(as_text=True)
+    assert "csv-preview-table" in html
+    assert "Identificação" in html
+    assert "Nome do aluno" in html
+    assert "Lesson 3: Past tense review" in html
+
+
 def test_upload_template_lessons_download(monkeypatch, tmp_path):
     monkeypatch.setattr(web_app, "ADMIN_PASSWORD", "testpass")
     monkeypatch.setattr(web_app, "DATA_DIR", tmp_path / "data")
@@ -219,4 +240,6 @@ def test_upload_template_lessons_download(monkeypatch, tmp_path):
 
     assert response.status_code == 200
     assert "lessons_template.csv" in response.headers.get("Content-Disposition", "")
+    assert response.data.startswith(b"\xef\xbb\xbf")
     assert b"turma,aula_num,date,licao_conteudo" in response.data
+    assert b"MASTER,2," in response.data

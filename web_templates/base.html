@@ -186,6 +186,21 @@ textarea { min-height: 58px; resize: vertical; }
 .report-actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
 .form-actions-bar { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--border); }
 
+/* ── CSV template preview ── */
+.csv-preview-wrap { border: 1px solid #E8E0F1; border-radius: 12px; overflow: auto; background: #fff; -webkit-overflow-scrolling: touch; }
+.csv-preview-table { width: max-content; min-width: 100%; border-collapse: collapse; font-size: 11px; }
+.csv-preview-table th,
+.csv-preview-table td { padding: 8px 10px; border-bottom: 1px solid #EEE; vertical-align: top; text-align: left; max-width: 220px; }
+.csv-preview-table thead th { background: #5B2D8E; color: #fff; font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.35px; white-space: nowrap; position: sticky; top: 0; z-index: 1; }
+.csv-preview-table thead tr.section-row th { background: #4A1F7C; font-size: 8px; letter-spacing: 0.6px; text-transform: uppercase; top: 0; }
+.csv-preview-table thead tr.label-row th { background: #6B3FA0; font-size: 9px; font-weight: 600; text-transform: none; letter-spacing: 0; top: 28px; }
+.csv-preview-table tbody tr:nth-child(even) td { background: #FBF8FF; }
+.csv-preview-table tbody td { color: #333; line-height: 1.45; }
+.csv-preview-table tbody td.score-cell { text-align: center; font-weight: 900; color: var(--purple); min-width: 36px; }
+.csv-preview-table tbody td.text-cell { min-width: 160px; white-space: normal; }
+.csv-preview-legend { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.csv-preview-legend span { font-size: 10px; font-weight: 700; color: var(--purple); background: var(--purple-lt); border-radius: 999px; padding: 4px 10px; }
+
 /* ── Mobile shell ── */
 .mobile-bar {
   display: none; align-items: center; gap: 10px; flex-wrap: wrap;

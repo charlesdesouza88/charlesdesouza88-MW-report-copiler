@@ -125,26 +125,39 @@
 
       <div style="border-top:1px solid #EEE; padding-top:16px;">
         <div style="font-size:12px; font-weight:900; color:#5B2D8E; margin-bottom:8px; text-transform:uppercase; letter-spacing:0.7px;">Visual do template</div>
-        <div style="border:1px solid #E8E0F1; border-radius:12px; overflow:hidden; background:#fff;">
-          <div style="display:grid; grid-template-columns:1.1fr 0.8fr 0.9fr 0.8fr 0.8fr 0.8fr; background:#5B2D8E; color:#fff; font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:0.4px;">
-            <div style="padding:10px 12px;">student_name</div>
-            <div style="padding:10px 12px;">turma</div>
-            <div style="padding:10px 12px;">turma_display</div>
-            <div style="padding:10px 12px;">speaking</div>
-            <div style="padding:10px 12px;">listening</div>
-            <div style="padding:10px 12px;">faltas</div>
-          </div>
-          <div style="display:grid; grid-template-columns:1.1fr 0.8fr 0.9fr 0.8fr 0.8fr 0.8fr; font-size:12px; color:#333; background:#FBF8FF;">
-            <div style="padding:11px 12px; border-top:1px solid #EEE;">Jane Doe</div>
-            <div style="padding:11px 12px; border-top:1px solid #EEE;">MASTER</div>
-            <div style="padding:11px 12px; border-top:1px solid #EEE;">Masters</div>
-            <div style="padding:11px 12px; border-top:1px solid #EEE;">4</div>
-            <div style="padding:11px 12px; border-top:1px solid #EEE;">5</div>
-            <div style="padding:11px 12px; border-top:1px solid #EEE;">1</div>
-          </div>
+        <div class="csv-preview-wrap">
+          <table class="csv-preview-table">
+            <thead>
+              <tr class="section-row">
+                {% for section in student_template_sections %}
+                <th colspan="{{ section.fields|length }}">{{ section.title }}</th>
+                {% endfor %}
+              </tr>
+              <tr class="label-row">
+                {% for col in student_preview_columns %}
+                <th title="{{ col.field }}">{{ col.label }}</th>
+                {% endfor %}
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in student_template_rows %}
+              <tr>
+                {% for col in student_preview_columns %}
+                {% set value = row.get(col.field, '') %}
+                <td class="{% if col.field in score_fields %}score-cell{% elif col.field.startswith('feedback_') or col.field in ('recomendacoes', 'observacao', 'horario', 'missed_aulas', 'aula_extra') %}text-cell{% endif %}">{{ value }}</td>
+                {% endfor %}
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <div class="csv-preview-legend">
+          {% for section in student_template_sections %}
+          <span>{{ section.title }}</span>
+          {% endfor %}
         </div>
         <div style="font-size:11px; color:#777; line-height:1.6; margin-top:10px;">
-          O template baixado inclui todas as colunas obrigatórias e uma linha de exemplo para servir de modelo.
+          O template baixado inclui todas as {{ student_fields|length }} colunas obrigatórias e uma linha de exemplo completa. Deslize horizontalmente para ver todas as seções.
         </div>
       </div>
     </div>
@@ -200,26 +213,29 @@
 
       <div style="border-top:1px solid #EEE; padding-top:16px;">
         <div style="font-size:12px; font-weight:900; color:#5B2D8E; margin-bottom:8px; text-transform:uppercase; letter-spacing:0.7px;">Visual do template</div>
-        <div style="border:1px solid #E8E0F1; border-radius:12px; overflow:hidden; background:#fff;">
-          <div style="display:grid; grid-template-columns:0.8fr 0.8fr 0.8fr 1.6fr 1.1fr 1fr; background:#5B2D8E; color:#fff; font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:0.4px;">
-            <div style="padding:10px 12px;">turma</div>
-            <div style="padding:10px 12px;">aula_num</div>
-            <div style="padding:10px 12px;">date</div>
-            <div style="padding:10px 12px;">licao_conteudo</div>
-            <div style="padding:10px 12px;">atividade_extra</div>
-            <div style="padding:10px 12px;">habilidades</div>
-          </div>
-          <div style="display:grid; grid-template-columns:0.8fr 0.8fr 0.8fr 1.6fr 1.1fr 1fr; font-size:12px; color:#333; background:#FBF8FF;">
-            <div style="padding:11px 12px; border-top:1px solid #EEE;">MASTER</div>
-            <div style="padding:11px 12px; border-top:1px solid #EEE;">1</div>
-            <div style="padding:11px 12px; border-top:1px solid #EEE;">03/09</div>
-            <div style="padding:11px 12px; border-top:1px solid #EEE;">Lesson 1: Introductions</div>
-            <div style="padding:11px 12px; border-top:1px solid #EEE;">Role-play</div>
-            <div style="padding:11px 12px; border-top:1px solid #EEE;">Speaking</div>
-          </div>
+        <div class="csv-preview-wrap">
+          <table class="csv-preview-table">
+            <thead>
+              <tr class="label-row">
+                {% for col in lesson_preview_columns %}
+                <th title="{{ col.field }}">{{ col.label }}</th>
+                {% endfor %}
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in lesson_template_rows %}
+              <tr>
+                {% for col in lesson_preview_columns %}
+                {% set value = row.get(col.field, '') %}
+                <td class="{% if col.field in ('licao_conteudo', 'atividade_extra', 'habilidades') %}text-cell{% endif %}">{{ value }}</td>
+                {% endfor %}
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
         </div>
         <div style="font-size:11px; color:#777; line-height:1.6; margin-top:10px;">
-          O código da turma deve ser igual ao usado no arquivo de alunos para que a presença e os conteúdos sejam vinculados corretamente.
+          O template baixado traz {{ lesson_template_rows|length }} aulas de exemplo. O código da turma deve ser igual ao usado no arquivo de alunos.
         </div>
       </div>
     </div>

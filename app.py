@@ -162,16 +162,70 @@ LESSON_FIELDS = [
     'turma', 'aula_num', 'date', 'licao_conteudo', 'atividade_extra', 'habilidades'
 ]
 
+TEMPLATE_DIR = BASE / 'data' / 'templates'
+
+STUDENT_FIELD_LABELS = {
+    'teacher': 'Professor',
+    'turma': 'Código turma',
+    'turma_display': 'Nome exibido',
+    'nivel': 'Nível / livro',
+    'horario': 'Horário',
+    'student_name': 'Nome do aluno',
+    'participacao': 'Participação',
+    'comportamento': 'Comportamento',
+    'speaking': 'Fala',
+    'listening': 'Audição',
+    'foco': 'Foco',
+    'writing': 'Escrita',
+    'reading': 'Leitura',
+    'gramatica': 'Gramática',
+    'trabalho_equipe': 'Trabalho em equipe',
+    'organizacao': 'Organização',
+    'pontualidade': 'Pontualidade',
+    'respeito_regras': 'Respeito às regras',
+    'faltas': 'Faltas',
+    'missed_aulas': 'Aulas perdidas',
+    'aula_extra': 'Aula extra',
+    'feedback_participacao': 'Feedback — participação',
+    'feedback_foco': 'Feedback — foco',
+    'feedback_trabalho_equipe': 'Feedback — equipe',
+    'recomendacoes': 'Recomendações',
+    'observacao': 'Observação',
+}
+
+LESSON_FIELD_LABELS = {
+    'turma': 'Código turma',
+    'aula_num': 'Nº da aula',
+    'date': 'Data',
+    'licao_conteudo': 'Conteúdo da lição',
+    'atividade_extra': 'Atividade extra',
+    'habilidades': 'Habilidades',
+}
+
+STUDENT_TEMPLATE_SECTIONS = [
+    {'title': 'Identificação', 'fields': ['teacher', 'turma', 'turma_display', 'nivel', 'horario', 'student_name']},
+    {'title': 'Notas (1–5)', 'fields': [
+        'participacao', 'comportamento', 'speaking', 'listening', 'foco',
+        'writing', 'reading', 'gramatica', 'trabalho_equipe', 'organizacao',
+        'pontualidade', 'respeito_regras',
+    ]},
+    {'title': 'Presença', 'fields': ['faltas', 'missed_aulas', 'aula_extra']},
+    {'title': 'Textos do relatório', 'fields': [
+        'feedback_participacao', 'feedback_foco', 'feedback_trabalho_equipe',
+        'recomendacoes', 'observacao',
+    ]},
+]
+
 TEMPLATE_ROWS = {
     'students': {
         'teacher': 'Chuck',
         'turma': 'MASTER',
         'turma_display': 'Masters',
         'nivel': 'Adults Book 4',
-        'horario': 'Terca e quinta, 19:00 - 20:00',
+        'horario': 'Terça e quinta, 19:00 - 20:00',
         'student_name': 'Jane Doe',
         'participacao': '4',
-        'comportamento': '3',
+        'comportamento': '4',
         'speaking': '4',
         'listening': '5',
         'foco': '4',
@@ -179,27 +233,85 @@ TEMPLATE_ROWS = {
         'reading': '4',
         'gramatica': '3',
         'trabalho_equipe': '4',
-        'organizacao': '3',
+        'organizacao': '4',
         'pontualidade': '4',
         'respeito_regras': '4',
         'faltas': '1',
         'missed_aulas': '2,5',
-        'aula_extra': 'Reforco',
-        'feedback_participacao': 'Participa bem em aula.',
-        'feedback_foco': 'Melhorar foco nas atividades longas.',
-        'feedback_trabalho_equipe': 'Boa colaboracao com colegas.',
-        'recomendacoes': 'Praticar speaking em casa 2x por semana.',
-        'observacao': 'Exemplo de preenchimento',
+        'aula_extra': 'Reforço',
+        'feedback_participacao': 'Participa bem em aula e responde quando solicitada.',
+        'feedback_foco': 'Mantém foco na maior parte do tempo.',
+        'feedback_trabalho_equipe': 'Colabora bem com colegas em atividades em grupo.',
+        'recomendacoes': 'Praticar speaking em casa 2x por semana com frases da aula.',
+        'observacao': 'Substitua este aluno de exemplo pelos dados reais da turma.',
     },
     'lessons': {
         'turma': 'MASTER',
         'aula_num': '1',
-        'date': '03/09',
-        'licao_conteudo': 'Lesson 1: Introductions',
-        'atividade_extra': 'Role-play em duplas',
+        'date': '10/02/2026',
+        'licao_conteudo': 'Lesson 1: Introductions & syllabus',
+        'atividade_extra': 'Syllabus / class rules',
         'habilidades': 'Speaking, Listening',
     },
 }
+
+LESSON_TEMPLATE_ROWS = [
+    TEMPLATE_ROWS['lessons'],
+    {
+        'turma': 'MASTER',
+        'aula_num': '2',
+        'date': '12/02/2026',
+        'licao_conteudo': 'Lesson 2: Daily routines',
+        'atividade_extra': 'Pair work — connection words',
+        'habilidades': 'Speaking, Writing',
+    },
+    {
+        'turma': 'MASTER',
+        'aula_num': '3',
+        'date': '19/02/2026',
+        'licao_conteudo': 'Lesson 3: Past tense review',
+        'atividade_extra': 'Group presentation',
+        'habilidades': 'Grammar, Speaking',
+    },
+]
+
+
+def _student_preview_columns():
+    columns = []
+    for section in STUDENT_TEMPLATE_SECTIONS:
+        for field in section['fields']:
+            columns.append({
+                'field': field,
+                'label': STUDENT_FIELD_LABELS.get(field, field),
+                'section': section['title'],
+            })
+    return columns
+
+
+def _lesson_preview_columns():
+    return [
+        {'field': field, 'label': LESSON_FIELD_LABELS.get(field, field)}
+        for field in LESSON_FIELDS
+    ]
+
+
+def _load_template_rows(name):
+    path = TEMPLATE_DIR / f'{name}_template.csv'
+    if path.exists():
+        return load_csv(path)
+    if name == 'students':
+        return [TEMPLATE_ROWS['students']]
+    return LESSON_TEMPLATE_ROWS
+
+
+def _build_template_csv(name):
+    fields = STUDENT_FIELDS if name == 'students' else LESSON_FIELDS
+    rows = _load_template_rows(name)
+    buf = io.StringIO()
+    writer = csv.DictWriter(buf, fieldnames=fields, extrasaction='ignore')
+    writer.writeheader()
+    writer.writerows(rows)
+    return '\ufeff' + buf.getvalue()
 
 
 def _read_csv_text(uploaded_file):
@@ -477,31 +589,34 @@ def upload():
         students_exists = (DATA_DIR / 'students.csv').exists()
         lessons_exists = (DATA_DIR / 'lessons.csv').exists()
     return render_template('upload.html', messages=messages, errors=errors,
-        students_exists=students_exists, lessons_exists=lessons_exists)
+        students_exists=students_exists, lessons_exists=lessons_exists,
+        student_template_rows=_load_template_rows('students'),
+        lesson_template_rows=_load_template_rows('lessons'),
+        student_field_labels=STUDENT_FIELD_LABELS,
+        lesson_field_labels=LESSON_FIELD_LABELS,
+        student_template_sections=STUDENT_TEMPLATE_SECTIONS,
+        student_fields=STUDENT_FIELDS,
+        lesson_fields=LESSON_FIELDS,
+        student_preview_columns=_student_preview_columns(),
+        lesson_preview_columns=_lesson_preview_columns(),
+        score_fields=sorted(SCORE_FIELDS),
+    )
 
 
 @app.route('/upload/template/<name>')
 @login_required
 def download_template(name):
-    if name == 'students':
-        fields = STUDENT_FIELDS
-    elif name == 'lessons':
-        fields = LESSON_FIELDS
-    else:
+    if name not in ('students', 'lessons'):
         abort(404)
 
-    buf = io.StringIO()
-    writer = csv.DictWriter(buf, fieldnames=fields)
-    writer.writeheader()
-    writer.writerow(TEMPLATE_ROWS[name])
-
-    data = io.BytesIO(buf.getvalue().encode('utf-8'))
+    buf = _build_template_csv(name)
+    data = io.BytesIO(buf.encode('utf-8'))
     data.seek(0)
     return send_file(
         data,
         as_attachment=True,
         download_name=f'{name}_template.csv',
-        mimetype='text/csv',
+        mimetype='text/csv; charset=utf-8',
     )
 
 
