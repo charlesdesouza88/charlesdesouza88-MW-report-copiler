@@ -54,6 +54,17 @@ class LessonRow(Base):
     data_json: Mapped[str] = mapped_column(Text, nullable=False)
 
 
+class UserRow(Base):
+    __tablename__ = "users"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    email: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
+    password_hash: Mapped[str] = mapped_column(Text, nullable=False)
+    role: Mapped[str] = mapped_column(Text, nullable=False)
+    teacher_name: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    active: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+
+
 class DatabaseStore:
     def __init__(self, database_url: str):
         prepared = prepare_database_url(database_url)
@@ -71,6 +82,9 @@ class DatabaseStore:
         self.session_factory = sessionmaker(bind=self.engine, expire_on_commit=False)
 
     def initialize(self):
+        Base.metadata.create_all(self.engine)
+
+    def initialize_users(self):
         Base.metadata.create_all(self.engine)
 
     def check_connection(self):
@@ -100,6 +114,35 @@ class DatabaseStore:
 
     def save_lessons(self, rows):
         self._replace_rows(LessonRow, rows)
+
+    def load_users(self):
+        with self.session() as session:
+            q = select(UserRow).order_by(UserRow.id.asc())
+            records = session.execute(q).scalars().all()
+            return [
+                {
+                    'id': r.id,
+                    'email': r.email,
+                    'password_hash': r.password_hash,
+                    'role': r.role,
+                    'teacher_name': r.teacher_name or '',
+                    'active': bool(r.active),
+                }
+                for r in records
+            ]
+
+    def save_users(self, users):
+        with self.session() as session:
+            session.query(UserRow).delete()
+            for u in users:
+                session.add(UserRow(
+                    id=u.get('id'),
+                    email=u['email'],
+                    password_hash=u['password_hash'],
+                    role=u['role'],
+                    teacher_name=u.get('teacher_name') or '',
+                    active=1 if u.get('active', True) else 0,
+                ))
 
     def _load_rows(self, model):
         with self.session() as session:

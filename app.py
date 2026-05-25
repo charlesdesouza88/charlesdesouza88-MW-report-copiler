@@ -18,6 +18,12 @@ from jinja2 import Environment, FileSystemLoader
 from compiler import (generate_class_diagnostics, generate_individual_reports,
                       group_by_turma, load_csv)
 
+from auth import (ROLE_ADMIN, ROLE_LABELS, ROLE_SUPERADMIN, ROLE_TEACHER,
+                  UserStore, can_manage_teachers, filter_lessons_for_user,
+                  filter_reports_for_user, filter_students_for_user,
+                  find_student_global_index, has_full_data_access,
+                  normalize_teacher_name, user_public_dict)
+
 try:
     from db_store import DatabaseStore
 except Exception as exc:
@@ -143,7 +149,19 @@ OUT_DIR = _ensure_writable_dir(
 
 app = Flask(__name__, template_folder='web_templates')
 app.secret_key = os.environ.get('SECRET_KEY', 'mw-dev-change-in-prod')
-ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', 'admin')
+ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', '')
+SUPERADMIN_EMAIL = os.environ.get('SUPERADMIN_EMAIL', 'admin@misterwiz.local').strip()
+SUPERADMIN_PASSWORD = os.environ.get('SUPERADMIN_PASSWORD', ADMIN_PASSWORD).strip()
+
+user_store = UserStore(
+    db_store=db_store,
+    json_path=DATA_DIR / 'users.json',
+)
+try:
+    user_store.initialize()
+    user_store.ensure_bootstrap_superadmin(SUPERADMIN_EMAIL, SUPERADMIN_PASSWORD)
+except Exception as exc:
+    logger.exception('User store initialization failed: %s', exc)
 
 STUDENT_FIELDS = [
     'teacher', 'turma', 'turma_display', 'nivel', 'horario', 'student_name',
@@ -385,13 +403,96 @@ def _validate_csv(key, text):
     return errors
 
 
+def _current_user():
+    user_id = session.get('user_id')
+    if not user_id:
+        return None
+    return {
+        'id': user_id,
+        'email': session.get('email', ''),
+        'role': session.get('role', ''),
+        'teacher_name': session.get('teacher_name', ''),
+    }
+
+
+def _login_session(user):
+    session.clear()
+    session['authenticated'] = True
+    session['user_id'] = user['id']
+    session['email'] = user['email']
+    session['role'] = user['role']
+    session['teacher_name'] = user.get('teacher_name') or ''
+
+
 def login_required(f):
     @functools.wraps(f)
     def decorated(*args, **kwargs):
-        if not session.get('authenticated'):
+        if not _current_user():
             return redirect(url_for('login'))
         return f(*args, **kwargs)
     return decorated
+
+
+def role_required(*roles):
+    def decorator(f):
+        @functools.wraps(f)
+        @login_required
+        def wrapped(*args, **kwargs):
+            user = _current_user()
+            if user['role'] not in roles:
+                abort(403)
+            return f(*args, **kwargs)
+        return wrapped
+    return decorator
+
+
+def _scoped_students():
+    all_students = _load_students()
+    user = _current_user()
+    if not user:
+        return all_students, []
+    visible = filter_students_for_user(all_students, user)
+    return all_students, visible
+
+
+def _scoped_lessons(all_students=None):
+    all_lessons = _load_lessons()
+    user = _current_user()
+    if not user:
+        return all_lessons, []
+    if all_students is None:
+        all_students = _load_students()
+    visible = filter_lessons_for_user(all_lessons, all_students, user)
+    return all_lessons, visible
+
+
+def _merge_scoped_students(all_students, visible_students):
+    """Replace visible rows in full list; used when teachers save edits."""
+    if has_full_data_access(_current_user()['role']):
+        return visible_students
+    merged = list(all_students)
+    visible_set = {id(r) for r in visible_students}
+    for i, row in enumerate(merged):
+        if id(row) in visible_set:
+            for v in visible_students:
+                if v is row or (
+                    v.get('turma') == row.get('turma')
+                    and v.get('student_name') == row.get('student_name')
+                    and v.get('teacher') == row.get('teacher')
+                ):
+                    merged[i] = v
+                    break
+    return merged
+
+
+@app.context_processor
+def inject_auth():
+    user = _current_user()
+    return {
+        'current_user': user,
+        'role_labels': ROLE_LABELS,
+        'can_manage_teachers': can_manage_teachers(user['role']) if user else False,
+    }
 
 
 def _load_students():
@@ -462,10 +563,13 @@ def health_db():
 def login():
     error = None
     if request.method == 'POST':
-        if request.form.get('password') == ADMIN_PASSWORD:
-            session['authenticated'] = True
+        email = request.form.get('email', '')
+        password = request.form.get('password', '')
+        user = user_store.authenticate(email, password)
+        if user:
+            _login_session(user)
             return redirect(url_for('dashboard'))
-        error = 'Senha incorreta. Tente novamente.'
+        error = 'E-mail ou senha incorretos.'
     return render_template('login.html', error=error)
 
 
@@ -480,9 +584,9 @@ def logout():
 @app.route('/')
 @login_required
 def dashboard():
-    students = _load_students()
-    lessons = _load_lessons()
-    reports = sorted(OUT_DIR.glob('*.html'))
+    all_students, students = _scoped_students()
+    _, lessons = _scoped_lessons(all_students)
+    reports = filter_reports_for_user(sorted(OUT_DIR.glob('*.html')), all_students, _current_user())
     turmas = group_by_turma(students) if students else {}
     individual = [f for f in reports if 'class_diagnostic' not in f.name]
     if db_store:
@@ -507,7 +611,7 @@ def dashboard():
 @app.route('/students')
 @login_required
 def students():
-    rows = _load_students()
+    _, rows = _scoped_students()
     turmas = sorted(set(r['turma'] for r in rows))
     return render_template('students.html', students=rows, turmas=turmas)
 
@@ -515,29 +619,45 @@ def students():
 @app.route('/students/<int:idx>/edit', methods=['GET', 'POST'])
 @login_required
 def student_edit(idx):
-    rows = _load_students()
-    if idx < 0 or idx >= len(rows):
+    all_rows, visible = _scoped_students()
+    if idx < 0 or idx >= len(visible):
         abort(404)
+    user = _current_user()
     if request.method == 'POST':
         for field in STUDENT_FIELDS:
-            rows[idx][field] = request.form.get(field, '')
-        _save_students(rows)
+            visible[idx][field] = request.form.get(field, '')
+        if user['role'] == ROLE_TEACHER:
+            visible[idx]['teacher'] = user.get('teacher_name') or visible[idx].get('teacher', '')
+        if has_full_data_access(user['role']):
+            _save_students(visible)
+        else:
+            global_idx = find_student_global_index(all_rows, visible, idx)
+            if global_idx is None:
+                abort(404)
+            all_rows[global_idx] = visible[idx]
+            _save_students(all_rows)
         return redirect(url_for('students'))
     return render_template('student_edit.html',
-        student=rows[idx], idx=idx, score_fields=SCORE_FIELDS, is_new=False)
+        student=visible[idx], idx=idx, score_fields=SCORE_FIELDS, is_new=False)
 
 
 @app.route('/students/new', methods=['GET', 'POST'])
 @login_required
 def student_new():
-    rows = _load_students()
+    all_rows, visible = _scoped_students()
+    user = _current_user()
     if request.method == 'POST':
-        rows.append({f: request.form.get(f, '') for f in STUDENT_FIELDS})
-        _save_students(rows)
+        new_row = {f: request.form.get(f, '') for f in STUDENT_FIELDS}
+        if user['role'] == ROLE_TEACHER:
+            new_row['teacher'] = user.get('teacher_name') or new_row.get('teacher', '')
+        all_rows.append(new_row)
+        _save_students(all_rows)
         return redirect(url_for('students'))
-    defaults = dict(rows[0]) if rows else {}
+    defaults = dict(visible[0]) if visible else dict(all_rows[0]) if all_rows else {}
     defaults['student_name'] = ''
     defaults.setdefault('faltas', '0')
+    if user['role'] == ROLE_TEACHER:
+        defaults['teacher'] = user.get('teacher_name', '')
     return render_template('student_edit.html',
         student=defaults, idx=None, score_fields=SCORE_FIELDS, is_new=True)
 
@@ -545,17 +665,22 @@ def student_new():
 @app.route('/students/<int:idx>/delete', methods=['POST'])
 @login_required
 def student_delete(idx):
-    rows = _load_students()
-    if 0 <= idx < len(rows):
-        rows.pop(idx)
-        _save_students(rows)
+    all_rows, visible = _scoped_students()
+    if 0 <= idx < len(visible):
+        if has_full_data_access(_current_user()['role']):
+            all_rows.remove(visible[idx])
+        else:
+            global_idx = find_student_global_index(all_rows, visible, idx)
+            if global_idx is not None:
+                all_rows.pop(global_idx)
+        _save_students(all_rows)
     return redirect(url_for('students'))
 
 
 # ── Upload ────────────────────────────────────────────────────────────────────────────
 
 @app.route('/upload', methods=['GET', 'POST'])
-@login_required
+@role_required(ROLE_SUPERADMIN, ROLE_ADMIN)
 def upload():
     messages = []
     errors = []
@@ -604,7 +729,7 @@ def upload():
 
 
 @app.route('/upload/template/<name>')
-@login_required
+@role_required(ROLE_SUPERADMIN, ROLE_ADMIN)
 def download_template(name):
     if name not in ('students', 'lessons'):
         abort(404)
@@ -621,7 +746,7 @@ def download_template(name):
 
 
 @app.route('/upload/download/<name>')
-@login_required
+@role_required(ROLE_SUPERADMIN, ROLE_ADMIN)
 def download_csv(name):
     if name not in ('students', 'lessons'):
         abort(404)
@@ -649,62 +774,127 @@ def download_csv(name):
 @app.route('/generate', methods=['POST'])
 @login_required
 def generate():
-    if db_store:
-        students = _load_students()
-        lessons = _load_lessons()
-        if not students or not lessons:
-            return redirect(url_for('upload'))
+    all_students, students = _scoped_students()
+    _, lessons = _scoped_lessons(all_students)
+    user = _current_user()
 
+    if db_store:
+        if not students or not lessons:
+            return redirect(url_for('upload' if has_full_data_access(user['role']) else 'dashboard'))
         env = Environment(loader=FileSystemLoader(str(TMPL_DIR)), autoescape=False)
         generate_individual_reports(students, lessons, env, OUT_DIR)
         generate_class_diagnostics(students, lessons, env, OUT_DIR)
         return redirect(url_for('reports'))
 
-    students_file = DATA_DIR / 'students.csv'
-    lessons_file = DATA_DIR / 'lessons.csv'
-    if not students_file.exists() or not lessons_file.exists():
-        return redirect(url_for('upload'))
+    if has_full_data_access(user['role']):
+        students_file = DATA_DIR / 'students.csv'
+        lessons_file = DATA_DIR / 'lessons.csv'
+        students_text = students_file.read_text(encoding='utf-8')
+        lessons_text = lessons_file.read_text(encoding='utf-8')
+        students_errors = _validate_csv('students', students_text)
+        lessons_errors = _validate_csv('lessons', lessons_text)
+        if students_errors or lessons_errors:
+            errors = []
+            if students_errors:
+                errors.append(f'CSV de Alunos invalido: {students_errors[0]}')
+            if lessons_errors:
+                errors.append(f'CSV de Aulas invalido: {lessons_errors[0]}')
+            return render_template(
+                'upload.html',
+                messages=[],
+                errors=errors,
+                students_exists=students_file.exists(),
+                lessons_exists=lessons_file.exists(),
+            )
 
-    students_text = students_file.read_text(encoding='utf-8')
-    lessons_text = lessons_file.read_text(encoding='utf-8')
-    students_errors = _validate_csv('students', students_text)
-    lessons_errors = _validate_csv('lessons', lessons_text)
-    if students_errors or lessons_errors:
-        errors = []
-        if students_errors:
-            errors.append(f'CSV de Alunos invalido: {students_errors[0]}')
-        if lessons_errors:
-            errors.append(f'CSV de Aulas invalido: {lessons_errors[0]}')
-        return render_template(
-            'upload.html',
-            messages=[],
-            errors=errors,
-            students_exists=students_file.exists(),
-            lessons_exists=lessons_file.exists(),
-        )
-
-    students = load_csv(students_file)
-    lessons = load_csv(lessons_file)
     env = Environment(loader=FileSystemLoader(str(TMPL_DIR)), autoescape=False)
     generate_individual_reports(students, lessons, env, OUT_DIR)
     generate_class_diagnostics(students, lessons, env, OUT_DIR)
     return redirect(url_for('reports'))
 
 
+@app.route('/admin/teachers', methods=['GET', 'POST'])
+@role_required(ROLE_SUPERADMIN, ROLE_ADMIN)
+def manage_teachers():
+    messages = []
+    errors = []
+    actor = _current_user()
+
+    if request.method == 'POST':
+        action = request.form.get('action', '')
+        try:
+            if action == 'create_teacher':
+                user_store.create_teacher(
+                    request.form.get('email', ''),
+                    request.form.get('password', ''),
+                    request.form.get('teacher_name', ''),
+                )
+                messages.append('Conta de professor criada.')
+            elif action == 'create_admin' and actor['role'] == ROLE_SUPERADMIN:
+                user_store.create_admin(
+                    request.form.get('email', ''),
+                    request.form.get('password', ''),
+                    request.form.get('role', ROLE_ADMIN),
+                )
+                messages.append('Conta administrativa criada.')
+            elif action == 'update':
+                user_id = int(request.form.get('user_id', '0'))
+                password = request.form.get('password', '').strip()
+                user_store.update_user(
+                    user_id,
+                    email=request.form.get('email'),
+                    password=password or None,
+                    teacher_name=request.form.get('teacher_name'),
+                    active=request.form.get('active') == '1',
+                )
+                messages.append('Usuário atualizado.')
+            elif action == 'delete':
+                user_id = int(request.form.get('user_id', '0'))
+                user_store.delete_user(user_id, actor_id=actor['id'])
+                messages.append('Usuário removido.')
+        except (ValueError, TypeError) as exc:
+            errors.append(str(exc))
+
+    users = [user_public_dict(u) for u in user_store.list_users()]
+    teacher_names = sorted({
+        normalize_teacher_name(s.get('teacher', ''))
+        for s in _load_students()
+        if s.get('teacher', '').strip()
+    })
+    return render_template(
+        'teachers.html',
+        users=users,
+        teacher_names=teacher_names,
+        messages=messages,
+        errors=errors,
+        roles_manageable=[ROLE_ADMIN, ROLE_TEACHER] if actor['role'] == ROLE_SUPERADMIN else [ROLE_TEACHER],
+    )
+
+
 @app.route('/reports')
 @login_required
 def reports():
-    files = sorted(OUT_DIR.glob('*.html'))
+    all_students, _ = _scoped_students()
+    files = filter_reports_for_user(sorted(OUT_DIR.glob('*.html')), all_students, _current_user())
     individual = [f for f in files if 'class_diagnostic' not in f.name]
     diagnostics = [f for f in files if 'class_diagnostic' in f.name]
     return render_template('reports.html', individual=individual, diagnostics=diagnostics)
 
 
+def _allowed_report_path(filename):
+    path = OUT_DIR / Path(filename).name
+    if not path.exists() or path.suffix != '.html':
+        return None
+    all_students, _ = _scoped_students()
+    allowed = filter_reports_for_user([path], all_students, _current_user())
+    return path if allowed else None
+
+
 @app.route('/reports/preview/<path:filename>')
 @login_required
 def preview(filename):
-    path = OUT_DIR / Path(filename).name
-    if not path.exists() or path.suffix != '.html':
+    path = _allowed_report_path(filename)
+    if not path:
         abort(404)
     return path.read_text(encoding='utf-8')
 
@@ -712,8 +902,8 @@ def preview(filename):
 @app.route('/reports/download/<path:filename>')
 @login_required
 def download_report(filename):
-    path = OUT_DIR / Path(filename).name
-    if not path.exists():
+    path = _allowed_report_path(filename)
+    if not path:
         abort(404)
     return send_file(path, as_attachment=True)
 
@@ -721,9 +911,11 @@ def download_report(filename):
 @app.route('/reports/download-all')
 @login_required
 def download_all():
+    all_students, _ = _scoped_students()
+    files = filter_reports_for_user(sorted(OUT_DIR.glob('*.html')), all_students, _current_user())
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as zf:
-        for f in sorted(OUT_DIR.glob('*.html')):
+        for f in files:
             zf.write(f, f.name)
     buf.seek(0)
     return send_file(buf, mimetype='application/zip',

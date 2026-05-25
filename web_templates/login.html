@@ -34,13 +34,13 @@ body {
 h2 { font-size: 15px; font-weight: 900; color: #111; margin-bottom: 20px; text-align: center; }
 .form-group { margin-bottom: 16px; }
 label { display: block; font-size: 10px; font-weight: 700; color: #666; text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 6px; }
-input[type=password] {
+input[type=password], input[type=email], input[type=text] {
   width: 100%; padding: 11px 14px;
   border: 1.5px solid #DDD; border-radius: 8px;
   font-size: 16px; font-family: Arial, sans-serif;
   transition: border-color 0.12s;
 }
-input[type=password]:focus { outline: none; border-color: #5B2D8E; }
+input:focus { outline: none; border-color: #5B2D8E; }
 .error { background: #FADBD8; color: #C0392B; border: 1px solid #F1948A; border-radius: 7px; padding: 10px 14px; font-size: 12px; font-weight: 600; margin-bottom: 16px; }
 .btn-submit {
   width: 100%; padding: 12px; background: #5B2D8E; color: #fff;
@@ -57,7 +57,7 @@ input[type=password]:focus { outline: none; border-color: #5B2D8E; }
   <div class="logo">
     <div class="logo-mister">MISTER</div>
     <div class="logo-wiz">W<span class="star">✦</span>Z</div>
-    <div class="logo-sub">Admin Dashboard</div>
+    <div class="logo-sub">Plataforma de relatórios</div>
   </div>
   <h2>Entrar</h2>
   {% if error %}
@@ -65,12 +65,16 @@ input[type=password]:focus { outline: none; border-color: #5B2D8E; }
   {% endif %}
   <form method="post">
     <div class="form-group">
-      <label>Senha de acesso</label>
-      <input type="password" name="password" placeholder="••••••••" autofocus>
+      <label>E-mail</label>
+      <input type="email" name="email" placeholder="seu@email.com" autocomplete="username" required autofocus>
+    </div>
+    <div class="form-group">
+      <label>Senha</label>
+      <input type="password" name="password" placeholder="••••••••" autocomplete="current-password" required>
     </div>
     <button type="submit" class="btn-submit">Entrar</button>
   </form>
-  <div class="hint">Defina a senha via variável de ambiente ou arquivo .env<br><code>ADMIN_PASSWORD</code></div>
+  <div class="hint">Primeiro acesso: configure <code>SUPERADMIN_EMAIL</code> e <code>SUPERADMIN_PASSWORD</code> no .env</div>
 </div>
 </body>
 </html>

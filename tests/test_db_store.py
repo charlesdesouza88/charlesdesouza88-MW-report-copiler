@@ -40,3 +40,30 @@ def test_database_store_round_trip(tmp_path):
     assert store.load_lessons() == lessons
 
     store.check_connection()
+
+
+def test_database_store_users_round_trip(tmp_path):
+    db_path = tmp_path / "app.db"
+    store = DatabaseStore(f"sqlite:///{db_path}")
+    store.initialize()
+
+    users = [
+        {
+            "id": 1,
+            "email": "admin@test.local",
+            "password_hash": "hash",
+            "role": "superadmin",
+            "teacher_name": "",
+            "active": True,
+        },
+        {
+            "id": 2,
+            "email": "teacher@test.local",
+            "password_hash": "hash2",
+            "role": "teacher",
+            "teacher_name": "Chuck",
+            "active": True,
+        },
+    ]
+    store.save_users(users)
+    assert store.load_users() == users

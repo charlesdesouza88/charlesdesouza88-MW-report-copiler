@@ -19,8 +19,23 @@ def _lessons_csv():
     )
 
 
+def _init_user_store(monkeypatch, data_dir):
+    from auth import UserStore
+
+    store = UserStore(db_store=None, json_path=data_dir / "users.json")
+    store.initialize()
+    store.ensure_bootstrap_superadmin("admin@test.local", "testpass")
+    monkeypatch.setattr(web_app, "user_store", store)
+    monkeypatch.setattr(web_app, "SUPERADMIN_EMAIL", "admin@test.local")
+    monkeypatch.setattr(web_app, "SUPERADMIN_PASSWORD", "testpass")
+
+
 def _login(client):
-    return client.post("/login", data={"password": "testpass"}, follow_redirects=False)
+    return client.post(
+        "/login",
+        data={"email": "admin@test.local", "password": "testpass"},
+        follow_redirects=False,
+    )
 
 
 def test_health_returns_ok():
@@ -40,11 +55,11 @@ def test_health_db_csv_mode():
 
 
 def test_login_success_sets_session(monkeypatch, tmp_path):
-    monkeypatch.setattr(web_app, "ADMIN_PASSWORD", "testpass")
     monkeypatch.setattr(web_app, "DATA_DIR", tmp_path / "data")
     monkeypatch.setattr(web_app, "OUT_DIR", tmp_path / "output")
     web_app.DATA_DIR.mkdir()
     web_app.OUT_DIR.mkdir()
+    _init_user_store(monkeypatch, web_app.DATA_DIR)
 
     client = web_app.app.test_client()
     response = _login(client)
@@ -74,7 +89,7 @@ def test_generate_reports_writes_html_files(monkeypatch, tmp_path):
     (data_dir / "students.csv").write_text(_students_csv(), encoding="utf-8")
     (data_dir / "lessons.csv").write_text(_lessons_csv(), encoding="utf-8")
 
-    monkeypatch.setattr(web_app, "ADMIN_PASSWORD", "testpass")
+    _init_user_store(monkeypatch, data_dir)
     monkeypatch.setattr(web_app, "BASE", Path(web_app.__file__).parent)
     monkeypatch.setattr(web_app, "DATA_DIR", data_dir)
     monkeypatch.setattr(web_app, "TMPL_DIR", Path(web_app.__file__).parent / "templates")
@@ -97,10 +112,10 @@ def test_reports_preview_path_is_sanitized(monkeypatch, tmp_path):
     out_dir.mkdir()
     (out_dir / "safe.html").write_text("<html>ok</html>", encoding="utf-8")
 
-    monkeypatch.setattr(web_app, "ADMIN_PASSWORD", "testpass")
     monkeypatch.setattr(web_app, "DATA_DIR", tmp_path / "data")
     monkeypatch.setattr(web_app, "OUT_DIR", out_dir)
     web_app.DATA_DIR.mkdir(exist_ok=True)
+    _init_user_store(monkeypatch, web_app.DATA_DIR)
 
     client = web_app.app.test_client()
     _login(client)
@@ -113,11 +128,11 @@ def test_reports_preview_path_is_sanitized(monkeypatch, tmp_path):
 
 
 def test_upload_invalid_students_csv_shows_error_and_does_not_crash(monkeypatch, tmp_path):
-    monkeypatch.setattr(web_app, "ADMIN_PASSWORD", "testpass")
     monkeypatch.setattr(web_app, "DATA_DIR", tmp_path / "data")
     monkeypatch.setattr(web_app, "OUT_DIR", tmp_path / "output")
     web_app.DATA_DIR.mkdir()
     web_app.OUT_DIR.mkdir()
+    _init_user_store(monkeypatch, web_app.DATA_DIR)
 
     client = web_app.app.test_client()
     _login(client)
@@ -135,11 +150,11 @@ def test_upload_invalid_students_csv_shows_error_and_does_not_crash(monkeypatch,
 
 
 def test_upload_template_students_download(monkeypatch, tmp_path):
-    monkeypatch.setattr(web_app, "ADMIN_PASSWORD", "testpass")
     monkeypatch.setattr(web_app, "DATA_DIR", tmp_path / "data")
     monkeypatch.setattr(web_app, "OUT_DIR", tmp_path / "output")
     web_app.DATA_DIR.mkdir()
     web_app.OUT_DIR.mkdir()
+    _init_user_store(monkeypatch, web_app.DATA_DIR)
 
     client = web_app.app.test_client()
     _login(client)
@@ -165,14 +180,15 @@ def test_login_page_has_viewport(monkeypatch, tmp_path):
     html = response.get_data(as_text=True)
     assert 'name="viewport"' in html
     assert "width=device-width" in html
+    assert 'name="email"' in html
 
 
 def test_authenticated_shell_has_drawer_markup(monkeypatch, tmp_path):
-    monkeypatch.setattr(web_app, "ADMIN_PASSWORD", "testpass")
     monkeypatch.setattr(web_app, "DATA_DIR", tmp_path / "data")
     monkeypatch.setattr(web_app, "OUT_DIR", tmp_path / "output")
     web_app.DATA_DIR.mkdir()
     web_app.OUT_DIR.mkdir()
+    _init_user_store(monkeypatch, web_app.DATA_DIR)
 
     client = web_app.app.test_client()
     _login(client)
@@ -191,10 +207,10 @@ def test_students_page_has_dual_view_markup(monkeypatch, tmp_path):
     data_dir.mkdir()
     (data_dir / "students.csv").write_text(_students_csv(), encoding="utf-8")
 
-    monkeypatch.setattr(web_app, "ADMIN_PASSWORD", "testpass")
     monkeypatch.setattr(web_app, "DATA_DIR", data_dir)
     monkeypatch.setattr(web_app, "OUT_DIR", tmp_path / "output")
     web_app.OUT_DIR.mkdir()
+    _init_user_store(monkeypatch, data_dir)
 
     client = web_app.app.test_client()
     _login(client)
@@ -208,11 +224,11 @@ def test_students_page_has_dual_view_markup(monkeypatch, tmp_path):
 
 
 def test_upload_page_shows_csv_template_preview(monkeypatch, tmp_path):
-    monkeypatch.setattr(web_app, "ADMIN_PASSWORD", "testpass")
     monkeypatch.setattr(web_app, "DATA_DIR", tmp_path / "data")
     monkeypatch.setattr(web_app, "OUT_DIR", tmp_path / "output")
     web_app.DATA_DIR.mkdir()
     web_app.OUT_DIR.mkdir()
+    _init_user_store(monkeypatch, web_app.DATA_DIR)
 
     client = web_app.app.test_client()
     _login(client)
@@ -227,11 +243,11 @@ def test_upload_page_shows_csv_template_preview(monkeypatch, tmp_path):
 
 
 def test_upload_template_lessons_download(monkeypatch, tmp_path):
-    monkeypatch.setattr(web_app, "ADMIN_PASSWORD", "testpass")
     monkeypatch.setattr(web_app, "DATA_DIR", tmp_path / "data")
     monkeypatch.setattr(web_app, "OUT_DIR", tmp_path / "output")
     web_app.DATA_DIR.mkdir()
     web_app.OUT_DIR.mkdir()
+    _init_user_store(monkeypatch, web_app.DATA_DIR)
 
     client = web_app.app.test_client()
     _login(client)
