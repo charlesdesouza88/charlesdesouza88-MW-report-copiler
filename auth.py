@@ -80,6 +80,36 @@ def filter_lessons_for_user(lessons, students, user):
     return [l for l in lessons if l.get('turma', '').strip() in turmas]
 
 
+def filter_extra_sessions_for_user(sessions, user):
+    if has_full_data_access(user['role']):
+        return list(sessions)
+    key = normalize_teacher_name(user.get('teacher_name', '')).casefold()
+    if not key:
+        return []
+    return [
+        row for row in sessions
+        if normalize_teacher_name(row.get('teacher', '')).casefold() == key
+    ]
+
+
+def find_extra_session_global_index(all_sessions, filtered_sessions, filtered_idx):
+    if filtered_idx < 0 or filtered_idx >= len(filtered_sessions):
+        return None
+    target = filtered_sessions[filtered_idx]
+    for i, row in enumerate(all_sessions):
+        if row is target:
+            return i
+    for i, row in enumerate(all_sessions):
+        if (
+            row.get('student_name') == target.get('student_name')
+            and row.get('date') == target.get('date')
+            and row.get('horario') == target.get('horario')
+            and row.get('teacher') == target.get('teacher')
+        ):
+            return i
+    return None
+
+
 def student_report_filename(turma, student_name):
     safe_name = (student_name or '').replace(' ', '_')
     return f'{turma}_{safe_name}_report.html'

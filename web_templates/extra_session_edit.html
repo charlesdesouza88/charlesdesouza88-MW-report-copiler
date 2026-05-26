@@ -1,0 +1,108 @@
+{% extends 'base.html' %}
+{% from '_macros/datetime_fields.html' import date_picker, time_picker %}
+{% block title %}{{ 'Novo atendimento' if is_new else 'Editar atendimento' }}{% endblock %}
+{% block page_title %}{{ 'Novo atendimento' if is_new else 'Editar atendimento' }}{% endblock %}
+
+{% block topbar_actions %}
+  <a href="{{ url_for('extra_sessions') }}" class="btn btn-ghost">← Voltar</a>
+{% endblock %}
+
+{% block content %}
+<form method="post" style="max-width: 760px;">
+
+  <div class="form-section">
+    <div class="form-section-title">Aluno e professor</div>
+    <div class="form-grid form-grid-2">
+      <div class="form-group" style="grid-column: 1 / -1;">
+        <label>{{ field_labels.student_name }} *</label>
+        <input type="text" name="student_name" value="{{ session.student_name or '' }}" required
+               placeholder="Ex.: Maria Silva (Comet - A)">
+        <p class="font-sm text-gray" style="margin-top:6px;">Turma entre parênteses é detectada automaticamente.</p>
+      </div>
+      <div class="form-group">
+        <label>{{ field_labels.turma }}</label>
+        <input type="text" name="turma" value="{{ session.turma or '' }}" placeholder="Comet - A">
+      </div>
+      <div class="form-group">
+        <label>{{ field_labels.teacher }}</label>
+        {% if current_user and current_user.role == 'teacher' %}
+        <input type="text" value="{{ current_user.teacher_name or session.teacher or '' }}" readonly style="background:#f4f4f4;">
+        <input type="hidden" name="teacher" value="{{ current_user.teacher_name or session.teacher or '' }}">
+        {% else %}
+        <input type="text" name="teacher" value="{{ session.teacher or '' }}" list="teacher-names" placeholder="Amanda">
+        <datalist id="teacher-names">
+          {% for name in teacher_names %}
+          <option value="{{ name }}">
+          {% endfor %}
+        </datalist>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="form-section">
+    <div class="form-section-title">Agendamento</div>
+    <div class="form-grid form-grid-2">
+      <div class="form-group">
+        <label>{{ field_labels.session_type }}</label>
+        <select name="session_type">
+          {% for choice in session_type_choices %}
+          <option value="{{ choice }}" {% if session.session_type == choice %}selected{% endif %}>{{ choice }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-group">
+        <label>{{ field_labels.turno }}</label>
+        <select name="turno">
+          <option value="" {% if not session.turno %}selected{% endif %}>—</option>
+          <option value="Manhã" {% if session.turno == 'Manhã' %}selected{% endif %}>Manhã</option>
+          <option value="Tarde" {% if session.turno == 'Tarde' %}selected{% endif %}>Tarde</option>
+        </select>
+      </div>
+      {{ date_picker(session.date, field_labels.date) }}
+      {{ time_picker(session.horario, field_labels.horario) }}
+    </div>
+  </div>
+
+  <div class="form-section">
+    <div class="form-section-title">Conteúdo e acompanhamento</div>
+    <div class="form-group" style="margin-bottom:14px;">
+      <label>{{ field_labels.assuntos }}</label>
+      <input type="text" name="assuntos" value="{{ session.assuntos or '' }}" placeholder="Reforço - Reposição até a lição 12">
+    </div>
+    <div class="form-group" style="margin-bottom:14px;">
+      <label>{{ field_labels.observacao }}</label>
+      <textarea name="observacao" rows="3" style="width:100%; padding:10px 12px; border:1px solid #E2E2E2; border-radius:8px;">{{ session.observacao or '' }}</textarea>
+    </div>
+    <div class="form-grid form-grid-3">
+      <div class="form-group">
+        <label>{{ field_labels.contatado }}</label>
+        <select name="contatado">
+          <option value="" {% if not session.contatado %}selected{% endif %}>—</option>
+          <option value="OK" {% if is_status_ok(session.contatado) %}selected{% endif %}>OK</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>{{ field_labels.marcado }}</label>
+        <select name="marcado">
+          <option value="" {% if not session.marcado %}selected{% endif %}>—</option>
+          <option value="OK" {% if is_status_ok(session.marcado) %}selected{% endif %}>OK</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>{{ field_labels.realizado }}</label>
+        <select name="realizado">
+          <option value="" {% if not session.realizado %}selected{% endif %}>—</option>
+          <option value="OK" {% if is_status_ok(session.realizado) %}selected{% endif %}>OK</option>
+          <option value="NÃO" {% if session.realizado == 'NÃO' %}selected{% endif %}>NÃO / Faltou</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <div class="form-actions-bar flex gap-8" style="margin-top:20px;">
+    <button type="submit" class="btn btn-primary">Salvar atendimento</button>
+    <a href="{{ url_for('extra_sessions') }}" class="btn btn-ghost">Cancelar</a>
+  </div>
+</form>
+{% endblock %}

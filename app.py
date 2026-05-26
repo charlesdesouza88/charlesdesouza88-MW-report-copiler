@@ -19,11 +19,18 @@ from compiler import (generate_class_diagnostics, generate_individual_reports,
                       group_by_turma, load_csv)
 
 from auth import (ROLE_ADMIN, ROLE_LABELS, ROLE_SUPERADMIN, ROLE_TEACHER,
-                  UserStore, can_manage_teachers, filter_lessons_for_user,
-                  filter_reports_for_user, filter_students_for_user,
+                  UserStore, can_manage_teachers, filter_extra_sessions_for_user,
+                  filter_lessons_for_user, filter_reports_for_user,
+                  filter_students_for_user, find_extra_session_global_index,
                   find_lesson_global_index, find_student_global_index,
                   has_full_data_access, normalize_teacher_name, teacher_turmas,
                   user_public_dict)
+from extra_sessions import (EXTRA_SESSION_FIELD_LABELS, EXTRA_SESSION_FIELDS,
+                            build_atendimentos_template_csv,
+                            SESSION_TYPE_CHOICES, coerce_session_status_fields,
+                            display_status, is_status_ok, parse_import_csv,
+                            row_from_form)
+from form_ui import date_from_form, storage_date_to_iso, storage_time_to_input
 
 try:
     from db_store import DatabaseStore
@@ -134,6 +141,7 @@ def _database_status():
             'message': 'Connected to PostgreSQL.',
             'student_rows': len(students),
             'lesson_rows': len(lessons),
+            'extra_session_rows': len(db_store.load_extra_sessions()),
         }
     except Exception as exc:
         logger.exception('Database health check failed: %s', exc)
@@ -156,6 +164,13 @@ OUT_DIR = _ensure_writable_dir(
 
 app = Flask(__name__, template_folder='web_templates')
 app.secret_key = os.environ.get('SECRET_KEY', 'mw-dev-change-in-prod')
+
+app.jinja_env.globals.update(
+    storage_date_to_iso=storage_date_to_iso,
+    storage_time_to_input=storage_time_to_input,
+    is_status_ok=is_status_ok,
+    display_status=display_status,
+)
 ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', '')
 SUPERADMIN_EMAIL = os.environ.get('SUPERADMIN_EMAIL', 'admin@misterwiz.local').strip()
 SUPERADMIN_PASSWORD = os.environ.get('SUPERADMIN_PASSWORD', ADMIN_PASSWORD).strip()
@@ -589,7 +604,9 @@ def _teacher_may_use_turma(turma, all_students, user):
 
 
 def _lesson_from_form():
-    return {field: (request.form.get(field) or '').strip() for field in LESSON_FIELDS}
+    row = {field: (request.form.get(field) or '').strip() for field in LESSON_FIELDS}
+    row['date'] = date_from_form(request.form)
+    return row
 
 
 def _sort_lessons(rows):
@@ -668,6 +685,34 @@ def _save_lessons(lessons):
         writer = csv.DictWriter(f, fieldnames=LESSON_FIELDS, extrasaction='ignore')
         writer.writeheader()
         writer.writerows(lessons)
+
+
+def _load_extra_sessions():
+    if db_store:
+        rows = db_store.load_extra_sessions()
+    else:
+        path = DATA_DIR / 'extra_sessions.csv'
+        rows = load_csv(path) if path.exists() else []
+    return [coerce_session_status_fields(dict(row)) for row in rows]
+
+
+def _save_extra_sessions(rows):
+    if db_store:
+        db_store.save_extra_sessions(rows)
+        return
+    with open(DATA_DIR / 'extra_sessions.csv', 'w', newline='', encoding='utf-8') as f:
+        writer = csv.DictWriter(f, fieldnames=EXTRA_SESSION_FIELDS, extrasaction='ignore')
+        writer.writeheader()
+        writer.writerows(rows)
+
+
+def _scoped_extra_sessions():
+    all_rows = _load_extra_sessions()
+    user = _current_user()
+    if not user:
+        return all_rows, []
+    visible = filter_extra_sessions_for_user(all_rows, user)
+    return all_rows, visible
 
 
 def _csv_rows_from_text(text):
@@ -1000,6 +1045,160 @@ def lesson_new():
         allowed_turmas=allowed_turmas,
         lesson_field_labels=LESSON_FIELD_LABELS,
     )
+
+
+# ── Extra sessions (reforço / reposição / nivelamento) ───────────────────────────────
+
+@app.route('/extra-sessions')
+@login_required
+def extra_sessions():
+    _, rows = _scoped_extra_sessions()
+    teachers = sorted({r.get('teacher', '').strip() for r in rows if r.get('teacher', '').strip()})
+    types = sorted({r.get('session_type', '').strip() for r in rows if r.get('session_type', '').strip()})
+    message = session.pop('extra_session_flash_message', None)
+    error = session.pop('extra_session_flash_error', None)
+    return render_template(
+        'extra_sessions.html',
+        sessions=rows,
+        teachers=teachers,
+        session_types=types or list(SESSION_TYPE_CHOICES),
+        field_labels=EXTRA_SESSION_FIELD_LABELS,
+        message=message,
+        error=error,
+    )
+
+
+@app.route('/extra-sessions/new', methods=['GET', 'POST'])
+@login_required
+def extra_session_new():
+    all_rows, visible = _scoped_extra_sessions()
+    user = _current_user()
+    if request.method == 'POST':
+        new_row = row_from_form(request.form)
+        if user['role'] == ROLE_TEACHER:
+            new_row['teacher'] = user.get('teacher_name') or new_row.get('teacher', '')
+        if not new_row.get('student_name'):
+            abort(400)
+        all_rows.append(new_row)
+        _save_extra_sessions(all_rows)
+        return redirect(url_for('extra_sessions'))
+
+    defaults = {f: '' for f in EXTRA_SESSION_FIELDS}
+    defaults['session_type'] = 'Reforço'
+    if user['role'] == ROLE_TEACHER:
+        defaults['teacher'] = user.get('teacher_name', '')
+    return render_template(
+        'extra_session_edit.html',
+        session=defaults,
+        idx=None,
+        is_new=True,
+        field_labels=EXTRA_SESSION_FIELD_LABELS,
+        session_type_choices=SESSION_TYPE_CHOICES,
+        teacher_names=_teacher_names_from_students(),
+    )
+
+
+@app.route('/extra-sessions/<int:idx>/edit', methods=['GET', 'POST'])
+@login_required
+def extra_session_edit(idx):
+    all_rows, visible = _scoped_extra_sessions()
+    user = _current_user()
+    if idx < 0 or idx >= len(visible):
+        abort(404)
+
+    if request.method == 'POST':
+        updated = row_from_form(request.form)
+        if user['role'] == ROLE_TEACHER:
+            updated['teacher'] = user.get('teacher_name') or updated.get('teacher', '')
+        if not updated.get('student_name'):
+            abort(400)
+        global_idx = find_extra_session_global_index(all_rows, visible, idx)
+        if global_idx is None:
+            abort(404)
+        all_rows[global_idx] = updated
+        _save_extra_sessions(all_rows)
+        return redirect(url_for('extra_sessions'))
+
+    return render_template(
+        'extra_session_edit.html',
+        session=visible[idx],
+        idx=idx,
+        is_new=False,
+        field_labels=EXTRA_SESSION_FIELD_LABELS,
+        session_type_choices=SESSION_TYPE_CHOICES,
+        teacher_names=_teacher_names_from_students(),
+    )
+
+
+@app.route('/extra-sessions/<int:idx>/delete', methods=['POST'])
+@login_required
+def extra_session_delete(idx):
+    all_rows, visible = _scoped_extra_sessions()
+    if 0 <= idx < len(visible):
+        global_idx = find_extra_session_global_index(all_rows, visible, idx)
+        if global_idx is not None:
+            all_rows.pop(global_idx)
+            _save_extra_sessions(all_rows)
+    return redirect(url_for('extra_sessions'))
+
+
+@app.route('/extra-sessions/import', methods=['POST'])
+@role_required(ROLE_SUPERADMIN, ROLE_ADMIN)
+def extra_sessions_import():
+    f = request.files.get('file')
+    if not f or not f.filename:
+        return redirect(url_for('extra_sessions'))
+
+    text, decode_error = _read_csv_text(f)
+    if decode_error:
+        session['extra_session_flash_error'] = decode_error
+        return redirect(url_for('extra_sessions'))
+
+    rows, errors = parse_import_csv(text)
+    if errors:
+        session['extra_session_flash_error'] = errors[0]
+        return redirect(url_for('extra_sessions'))
+
+    mode = request.form.get('mode', 'merge')
+    if mode == 'replace':
+        _save_extra_sessions(rows)
+        session['extra_session_flash_message'] = f'{len(rows)} atendimento(s) importado(s) (substituiu tudo).'
+    else:
+        existing = _load_extra_sessions()
+        existing.extend(rows)
+        _save_extra_sessions(existing)
+        session['extra_session_flash_message'] = f'{len(rows)} atendimento(s) adicionado(s).'
+    return redirect(url_for('extra_sessions'))
+
+
+@app.route('/extra-sessions/template')
+@login_required
+def download_atendimentos_template():
+    user = _current_user()
+    teacher_name = None
+    if not has_full_data_access(user['role']):
+        teacher_name = normalize_teacher_name(user.get('teacher_name', ''))
+    csv_text = build_atendimentos_template_csv(
+        TEMPLATE_DIR,
+        teacher_name=teacher_name or None,
+    )
+    data = io.BytesIO(csv_text.encode('utf-8'))
+    data.seek(0)
+    return send_file(
+        data,
+        as_attachment=True,
+        download_name='atendimentos_template.csv',
+        mimetype='text/csv; charset=utf-8',
+    )
+
+
+def _teacher_names_from_students():
+    names = {
+        normalize_teacher_name(s.get('teacher', ''))
+        for s in _load_students()
+        if s.get('teacher', '').strip()
+    }
+    return sorted(n for n in names if n)
 
 
 @app.route('/lessons/<int:idx>/delete', methods=['POST'])

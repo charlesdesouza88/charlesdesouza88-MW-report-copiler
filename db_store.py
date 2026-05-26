@@ -54,6 +54,14 @@ class LessonRow(Base):
     data_json: Mapped[str] = mapped_column(Text, nullable=False)
 
 
+class ExtraSessionRow(Base):
+    __tablename__ = "extra_session_rows"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    row_order: Mapped[int] = mapped_column(Integer, nullable=False)
+    data_json: Mapped[str] = mapped_column(Text, nullable=False)
+
+
 class UserRow(Base):
     __tablename__ = "users"
 
@@ -114,6 +122,12 @@ class DatabaseStore:
 
     def save_lessons(self, rows):
         self._replace_rows(LessonRow, rows)
+
+    def load_extra_sessions(self):
+        return self._load_rows(ExtraSessionRow)
+
+    def save_extra_sessions(self, rows):
+        self._replace_rows(ExtraSessionRow, rows)
 
     def load_users(self):
         with self.session() as session:

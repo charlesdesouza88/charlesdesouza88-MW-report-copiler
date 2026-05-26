@@ -1,0 +1,22 @@
+{% macro date_picker(value, label) %}
+<div class="form-group">
+  <label>{{ label }}</label>
+  <input type="date"
+         name="date_picker"
+         class="input-datetime"
+         value="{{ storage_date_to_iso(value) }}"
+         aria-label="{{ label }}">
+</div>
+{% endmacro %}
+
+{% macro time_picker(value, label, field_name='horario') %}
+<div class="form-group">
+  <label>{{ label }}</label>
+  <input type="time"
+         name="{{ field_name }}"
+         class="input-datetime"
+         value="{{ storage_time_to_input(value) }}"
+         step="900"
+         aria-label="{{ label }}">
+</div>
+{% endmacro %}

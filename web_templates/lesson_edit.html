@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% from '_macros/datetime_fields.html' import date_picker %}
 {% block title %}{{ 'Nova aula' if is_new else 'Editar aula' }}{% endblock %}
 {% block page_title %}{{ 'Nova aula' if is_new else 'Editar aula — turma ' + (lesson.turma or '') }}{% endblock %}
 
@@ -36,10 +37,7 @@
         <label>{{ lesson_field_labels.aula_num }} *</label>
         <input type="text" name="aula_num" value="{{ lesson.aula_num or '' }}" required placeholder="1">
       </div>
-      <div class="form-group">
-        <label>{{ lesson_field_labels.date }}</label>
-        <input type="text" name="date" value="{{ lesson.date or '' }}" placeholder="10/02/2026">
-      </div>
+      {{ date_picker(lesson.date, lesson_field_labels.date) }}
     </div>
   </div>
 

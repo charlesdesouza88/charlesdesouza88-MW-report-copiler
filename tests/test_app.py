@@ -431,6 +431,77 @@ def test_teacher_upload_rejects_other_teacher_rows(monkeypatch, tmp_path):
     assert not (data_dir / "students.csv").exists()
 
 
+def test_extra_sessions_import_and_list(monkeypatch, tmp_path):
+    data_dir = tmp_path / "data"
+    data_dir.mkdir()
+    monkeypatch.setattr(web_app, "DATA_DIR", data_dir)
+    monkeypatch.setattr(web_app, "OUT_DIR", tmp_path / "output")
+    web_app.OUT_DIR.mkdir()
+    _init_user_store(monkeypatch, data_dir)
+
+    csv_body = (
+        ",Nome do aluno ou responsável,Data ,Horário,Assuntos trabalhados,Observação,"
+        "Turno,Contatado,Marcado,Realizado,Professor\n"
+        ",Import Kid (MASTER),01/05,09:00,Reforço - test,,Manhã,ok,ok,ok,Chuck\n"
+    )
+
+    client = web_app.app.test_client()
+    _login(client)
+    response = client.post(
+        "/extra-sessions/import",
+        data={"file": (io.BytesIO(csv_body.encode("utf-8")), "atendimentos.csv"), "mode": "merge"},
+        content_type="multipart/form-data",
+        follow_redirects=True,
+    )
+    assert response.status_code == 200
+    assert b"adicionado" in response.data
+    assert b"Import Kid" in response.data
+
+
+def test_teacher_extra_sessions_scoped(monkeypatch, tmp_path):
+    data_dir = tmp_path / "data"
+    data_dir.mkdir()
+    monkeypatch.setattr(web_app, "DATA_DIR", data_dir)
+    monkeypatch.setattr(web_app, "OUT_DIR", tmp_path / "output")
+    web_app.OUT_DIR.mkdir()
+    _init_teacher_store(monkeypatch, data_dir)
+
+    web_app._save_extra_sessions([
+        {"teacher": "Chuck", "student_name": "A", "turma": "T1", "date": "1", "horario": "",
+         "turno": "", "session_type": "Reforço", "assuntos": "", "observacao": "",
+         "contatado": "", "marcado": "", "realizado": ""},
+        {"teacher": "Ana", "student_name": "B", "turma": "T2", "date": "2", "horario": "",
+         "turno": "", "session_type": "Reforço", "assuntos": "", "observacao": "",
+         "contatado": "", "marcado": "", "realizado": ""},
+    ])
+
+    client = web_app.app.test_client()
+    _login(client, email="teacher@test.local", password="teachpass")
+    response = client.get("/extra-sessions")
+    assert response.status_code == 200
+    html = response.get_data(as_text=True)
+    assert ">A</strong>" in html or "student_name\">A" in html
+    assert ">B</strong>" not in html
+
+
+def test_download_atendimentos_template(monkeypatch, tmp_path):
+    data_dir = tmp_path / "data"
+    data_dir.mkdir()
+    monkeypatch.setattr(web_app, "DATA_DIR", data_dir)
+    monkeypatch.setattr(web_app, "OUT_DIR", tmp_path / "output")
+    web_app.OUT_DIR.mkdir()
+    _init_teacher_store(monkeypatch, data_dir)
+
+    client = web_app.app.test_client()
+    _login(client, email="teacher@test.local", password="teachpass")
+    response = client.get("/extra-sessions/template")
+    assert response.status_code == 200
+    assert "attachment" in response.headers.get("Content-Disposition", "")
+    body = response.get_data(as_text=True)
+    assert "Nome do aluno ou responsável" in body
+    assert "Chuck" in body
+
+
 def test_teacher_upload_merges_without_wiping_other_teachers(monkeypatch, tmp_path):
     data_dir = tmp_path / "data"
     data_dir.mkdir()

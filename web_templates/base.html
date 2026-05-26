@@ -117,12 +117,56 @@ tr:hover td { background: var(--purple-lt); }
 .form-grid-3 { grid-template-columns: 1fr 1fr 1fr; }
 .form-group { display: flex; flex-direction: column; gap: 5px; }
 label { font-size: 10px; font-weight: 700; color: var(--gray); text-transform: uppercase; letter-spacing: 0.5px; }
-input[type=text], input[type=password], input[type=number], select, textarea {
+input[type=text], input[type=password], input[type=number], input[type=email],
+input[type=date], input[type=time], select, textarea {
   padding: 8px 11px; border: 1px solid var(--border); border-radius: 6px;
-  font-family: var(--font); font-size: 13px; color: var(--text); background: var(--white);
+  font-family: var(--font); font-size: 13px; font-weight: 400; line-height: 1.35;
+  color: var(--text); background: var(--white);
 }
 input:focus, select:focus, textarea:focus { outline: 2px solid var(--purple); border-color: transparent; }
 textarea { min-height: 58px; resize: vertical; }
+.select-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.select-row select { flex: 1; min-width: 88px; }
+
+/* Calendar / clock inputs — match platform typography (WebKit + Firefox) */
+input.input-datetime {
+  min-height: 38px;
+  min-width: 168px;
+  color-scheme: light;
+  cursor: pointer;
+}
+input.input-datetime::-webkit-datetime-edit,
+input.input-datetime::-webkit-datetime-edit-fields-wrapper,
+input.input-datetime::-webkit-datetime-edit-text,
+input.input-datetime::-webkit-datetime-edit-month-field,
+input.input-datetime::-webkit-datetime-edit-day-field,
+input.input-datetime::-webkit-datetime-edit-year-field,
+input.input-datetime::-webkit-datetime-edit-hour-field,
+input.input-datetime::-webkit-datetime-edit-minute-field,
+input.input-datetime::-webkit-datetime-edit-ampm-field {
+  font-family: var(--font);
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--text);
+  padding: 0;
+}
+input.input-datetime::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  opacity: 0.55;
+  filter: none;
+  margin-left: 4px;
+}
+input.input-datetime:hover::-webkit-calendar-picker-indicator {
+  opacity: 0.85;
+}
+input.input-datetime::-webkit-date-and-time-value {
+  font-family: var(--font);
+  font-size: 13px;
+  color: var(--text);
+}
+input.input-datetime::-moz-focus-inner {
+  border: 0;
+}
 
 /* ── Score Picker ── */
 .score-row { display: flex; align-items: center; gap: 14px; }
@@ -322,6 +366,9 @@ body.nav-open .nav-backdrop { display: block; }
   </a>
   <a href="{{ url_for('lessons') }}" class="nav-link {% if 'lesson' in request.endpoint %}active{% endif %}">
     <span class="nav-icon">▤</span> Aulas
+  </a>
+  <a href="{{ url_for('extra_sessions') }}" class="nav-link {% if 'extra_session' in request.endpoint %}active{% endif %}">
+    <span class="nav-icon">◷</span> Reforço / Reposição
   </a>
   <a href="{{ url_for('upload') }}" class="nav-link {% if request.endpoint in ('upload', 'delete_csv') %}active{% endif %}">
     <span class="nav-icon">↑</span> Upload CSV

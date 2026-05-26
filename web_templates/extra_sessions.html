@@ -1,0 +1,195 @@
+{% extends 'base.html' %}
+{% block title %}Reforço e Reposições{% endblock %}
+{% block page_title %}Atendimentos — reforço, reposição e aulas extras{% endblock %}
+
+{% block topbar_actions %}
+  <a href="{{ url_for('extra_session_new') }}" class="btn btn-primary">+ Novo atendimento</a>
+{% endblock %}
+
+{% block content %}
+
+<p class="text-gray font-sm" style="margin-bottom:16px;">
+  Agende e acompanhe <strong>reforço</strong>, <strong>reposição de aulas perdidas</strong>, nivelamentos e aulas extras —
+  no mesmo formato da planilha de atendimentos (contato, marcação e realização).
+</p>
+
+{% if message %}
+<div class="alert alert-success">✓ &nbsp;{{ message }}</div>
+{% endif %}
+{% if error %}
+<div class="alert" style="background:#FADBD8; color:#A93226; border:1px solid #F1948A;">✕ &nbsp;{{ error }}</div>
+{% endif %}
+
+<div class="card" style="margin-bottom:20px; padding:18px;">
+  <div style="font-size:12px; font-weight:900; color:#5B2D8E; text-transform:uppercase; letter-spacing:0.6px; margin-bottom:10px;">Modelo CSV</div>
+  <p class="font-sm text-gray" style="margin-bottom:12px;">
+    Baixe o arquivo com as <strong>colunas corretas</strong> e linhas de exemplo (Nome, Data, Horário, Assuntos, Observação, Turno, Contatado, Marcado, Realizado, Professor).
+    Preencha no Excel ou Google Planilhas e importe abaixo{% if not can_manage_teachers %} ou cadastre manualmente{% endif %}.
+  </p>
+  <a href="{{ url_for('download_atendimentos_template') }}" class="btn btn-outline btn-sm">⇩ Baixar template CSV</a>
+</div>
+
+{% if can_manage_teachers %}
+<div class="card" style="margin-bottom:20px; padding:18px;">
+  <div style="font-size:12px; font-weight:900; color:#5B2D8E; text-transform:uppercase; letter-spacing:0.6px; margin-bottom:10px;">Importar planilha</div>
+  <p class="font-sm text-gray" style="margin-bottom:12px;">Envie o CSV preenchido (use o modelo acima). Colunas: Nome, Data, Horário, Assuntos, Observação, Turno, Contatado, Marcado, Realizado, Professor.</p>
+  <form method="post" action="{{ url_for('extra_sessions_import') }}" enctype="multipart/form-data" class="flex gap-8" style="flex-wrap:wrap; align-items:flex-end;">
+    <div>
+      <label class="font-sm text-gray" style="display:block; margin-bottom:6px;">Arquivo CSV</label>
+      <input type="file" name="file" accept=".csv" required>
+    </div>
+    <div>
+      <label class="font-sm text-gray" style="display:block; margin-bottom:6px;">Modo</label>
+      <select name="mode" style="padding:8px 12px; border-radius:8px; border:1px solid #DDD;">
+        <option value="merge">Adicionar aos existentes</option>
+        <option value="replace">Substituir todos</option>
+      </select>
+    </div>
+    <button type="submit" class="btn btn-outline btn-sm">⇧ Importar CSV</button>
+  </form>
+</div>
+{% endif %}
+
+{% if teachers or session_types %}
+<div class="filter-scroll mb-16" id="session-filters">
+  <button type="button" class="btn btn-sm btn-primary filter-btn" data-teacher="" data-type="">Todos</button>
+  {% for t in teachers %}
+  <button type="button" class="btn btn-sm btn-ghost filter-btn" data-teacher="{{ t }}" data-type="">{{ t }}</button>
+  {% endfor %}
+  {% for st in session_types %}
+  <button type="button" class="btn btn-sm btn-ghost filter-btn" data-teacher="" data-type="{{ st }}">{{ st }}</button>
+  {% endfor %}
+</div>
+{% endif %}
+
+{% if sessions %}
+<div class="table-wrap students-table-view">
+  <table>
+    <thead>
+      <tr>
+        <th>Aluno</th>
+        <th>Turma</th>
+        <th>Tipo</th>
+        <th>Data</th>
+        <th>Horário</th>
+        <th>Turno</th>
+        <th>Contatado</th>
+        <th>Marcado</th>
+        <th>Realizado</th>
+        <th>Professor</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in sessions %}
+      <tr class="session-row"
+          data-teacher="{{ row.teacher }}"
+          data-type="{{ row.session_type }}">
+        <td>
+          <strong>{{ row.student_name }}</strong>
+          {% if row.assuntos %}
+          <div class="font-sm text-gray" style="margin-top:4px;">{{ row.assuntos }}</div>
+          {% endif %}
+          {% if row.observacao %}
+          <div class="font-sm text-gray" style="margin-top:2px;">{{ row.observacao }}</div>
+          {% endif %}
+        </td>
+        <td class="font-sm">{% if row.turma %}<span class="tag">{{ row.turma }}</span>{% else %}—{% endif %}</td>
+        <td>
+          <span class="tag {% if row.session_type == 'Reposição' %}tag-orange{% endif %}">
+            {{ row.session_type or 'Reforço' }}
+          </span>
+        </td>
+        <td class="font-sm">{{ row.date or '—' }}</td>
+        <td class="font-sm">{{ row.horario or '—' }}</td>
+        <td class="font-sm">{{ row.turno or '—' }}</td>
+        <td class="font-sm">{% if is_status_ok(row.contatado) %}<span class="tag tag-green">OK</span>{% else %}{{ display_status(row.contatado) or '—' }}{% endif %}</td>
+        <td class="font-sm">{% if is_status_ok(row.marcado) %}<span class="tag tag-green">OK</span>{% else %}{{ display_status(row.marcado) or '—' }}{% endif %}</td>
+        <td class="font-sm">
+          {% if is_status_ok(row.realizado) %}<span class="tag tag-green">OK</span>
+          {% elif row.realizado == 'NÃO' %}<span class="tag tag-orange">NÃO</span>
+          {% else %}{{ display_status(row.realizado) or '—' }}{% endif %}
+        </td>
+        <td class="font-sm">{{ row.teacher or '—' }}</td>
+        <td>
+          <div class="flex gap-8">
+            <a href="{{ url_for('extra_session_edit', idx=loop.index0) }}" class="btn btn-ghost btn-xs">Editar</a>
+            <form method="post" action="{{ url_for('extra_session_delete', idx=loop.index0) }}"
+                  onsubmit="return confirm('Excluir este atendimento?')">
+              <button type="submit" class="btn btn-danger btn-xs">✕</button>
+            </form>
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="card" style="text-align:center; padding:48px;">
+  <p class="text-gray" style="margin-bottom:16px;">Nenhum atendimento de reforço ou reposição cadastrado.</p>
+  <a href="{{ url_for('extra_session_new') }}" class="btn btn-primary">+ Cadastrar primeiro atendimento</a>
+  {% if can_manage_teachers %}
+  <p class="font-sm text-gray" style="margin-top:16px;">ou importe a planilha de atendimentos acima.</p>
+  {% endif %}
+</div>
+{% endif %}
+
+<script>
+(function () {
+  const buttons = document.querySelectorAll('#session-filters .filter-btn');
+  const rows = document.querySelectorAll('.session-row');
+  if (!buttons.length) return;
+
+  let activeTeacher = '';
+  let activeType = '';
+
+  function applyFilters() {
+    rows.forEach((row) => {
+      const matchTeacher = !activeTeacher || row.dataset.teacher === activeTeacher;
+      const matchType = !activeType || row.dataset.type === activeType;
+      row.style.display = matchTeacher && matchType ? '' : 'none';
+    });
+  }
+
+  buttons.forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const t = btn.dataset.teacher || '';
+      const ty = btn.dataset.type || '';
+      if (t) {
+        activeTeacher = activeTeacher === t ? '' : t;
+        activeType = '';
+      } else if (ty) {
+        activeType = activeType === ty ? '' : ty;
+        activeTeacher = '';
+      } else {
+        activeTeacher = '';
+        activeType = '';
+      }
+      buttons.forEach((b) => b.classList.remove('btn-primary'));
+      buttons.forEach((b) => b.classList.add('btn-ghost'));
+      if (activeTeacher) {
+        buttons.forEach((b) => {
+          if (b.dataset.teacher === activeTeacher) {
+            b.classList.add('btn-primary');
+            b.classList.remove('btn-ghost');
+          }
+        });
+      } else if (activeType) {
+        buttons.forEach((b) => {
+          if (b.dataset.type === activeType) {
+            b.classList.add('btn-primary');
+            b.classList.remove('btn-ghost');
+          }
+        });
+      } else {
+        buttons[0].classList.add('btn-primary');
+        buttons[0].classList.remove('btn-ghost');
+      }
+      applyFilters();
+    });
+  });
+})();
+</script>
+
+{% endblock %}
