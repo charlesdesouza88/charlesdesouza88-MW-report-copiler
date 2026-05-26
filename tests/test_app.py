@@ -406,9 +406,38 @@ def test_teacher_delete_only_own_students(monkeypatch, tmp_path):
     assert "Bob Smith" in remaining
 
 
-def test_teacher_cannot_upload_csv(monkeypatch, tmp_path):
+def test_teacher_upload_rejects_other_teacher_rows(monkeypatch, tmp_path):
     data_dir = tmp_path / "data"
     data_dir.mkdir()
+
+    monkeypatch.setattr(web_app, "DATA_DIR", data_dir)
+    monkeypatch.setattr(web_app, "OUT_DIR", tmp_path / "output")
+    web_app.OUT_DIR.mkdir()
+    _init_teacher_store(monkeypatch, data_dir)
+
+    bad_csv = _students_csv().replace("Chuck,", "Ana,", 1)
+
+    client = web_app.app.test_client()
+    _login(client, email="teacher@test.local", password="teachpass")
+    response = client.post(
+        "/upload",
+        data={"students": (io.BytesIO(bad_csv.encode()), "students.csv")},
+        content_type="multipart/form-data",
+        follow_redirects=True,
+    )
+
+    assert response.status_code == 200
+    assert b"teacher deve ser" in response.data
+    assert not (data_dir / "students.csv").exists()
+
+
+def test_teacher_upload_merges_without_wiping_other_teachers(monkeypatch, tmp_path):
+    data_dir = tmp_path / "data"
+    data_dir.mkdir()
+    (data_dir / "students.csv").write_text(
+        _students_csv().replace("Jane Doe", "Bob Smith").replace("Chuck,", "Ana,", 1),
+        encoding="utf-8",
+    )
 
     monkeypatch.setattr(web_app, "DATA_DIR", data_dir)
     monkeypatch.setattr(web_app, "OUT_DIR", tmp_path / "output")
@@ -421,6 +450,11 @@ def test_teacher_cannot_upload_csv(monkeypatch, tmp_path):
         "/upload",
         data={"students": (io.BytesIO(_students_csv().encode()), "students.csv")},
         content_type="multipart/form-data",
+        follow_redirects=True,
     )
 
-    assert response.status_code == 403
+    assert response.status_code == 200
+    assert b"Alunos carregado" in response.data
+    text = (data_dir / "students.csv").read_text(encoding="utf-8")
+    assert "Jane Doe" in text
+    assert "Bob Smith" in text

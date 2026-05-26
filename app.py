@@ -421,6 +421,98 @@ def _validate_csv(key, text):
     return errors
 
 
+def _teacher_scope_errors(user):
+    if has_full_data_access(user['role']):
+        return None
+    if user['role'] != ROLE_TEACHER:
+        return ['Conta sem permissão para enviar CSV.']
+    if not normalize_teacher_name(user.get('teacher_name', '')):
+        return ['Seu perfil não tem nome de professor vinculado. Peça ao admin em Usuários.']
+    return None
+
+
+def _validate_teacher_student_rows(rows, user):
+    teacher_key = normalize_teacher_name(user.get('teacher_name', '')).casefold()
+    expected = user.get('teacher_name', '')
+    errors = []
+    for idx, row in enumerate(rows, start=2):
+        row_teacher = normalize_teacher_name(row.get('teacher', '')).casefold()
+        if row_teacher != teacher_key:
+            errors.append(
+                f'Linha {idx}: coluna teacher deve ser "{expected}" (apenas seus alunos).',
+            )
+        if len(errors) >= 10:
+            errors.append('Muitos erros encontrados; corrija os primeiros e tente novamente.')
+            break
+    return errors
+
+
+def _validate_teacher_lesson_rows(rows, user, students):
+    turmas = teacher_turmas(students, user.get('teacher_name', ''))
+    if not turmas:
+        return [
+            'Nenhuma turma vinculada ao seu perfil. Envie o CSV de alunos antes das aulas.',
+        ]
+    errors = []
+    for idx, row in enumerate(rows, start=2):
+        turma = row.get('turma', '').strip()
+        if turma not in turmas:
+            errors.append(
+                f'Linha {idx}: turma "{turma}" não é sua '
+                f'(permitidas: {", ".join(sorted(turmas))}).',
+            )
+        if len(errors) >= 10:
+            errors.append('Muitos erros encontrados; corrija os primeiros e tente novamente.')
+            break
+    return errors
+
+
+def _merge_teacher_students(new_rows, user):
+    teacher_key = normalize_teacher_name(user.get('teacher_name', '')).casefold()
+    kept = [
+        row for row in _load_students()
+        if normalize_teacher_name(row.get('teacher', '')).casefold() != teacher_key
+    ]
+    return kept + new_rows
+
+
+def _merge_teacher_lessons(new_rows, user, students):
+    turmas = teacher_turmas(students, user.get('teacher_name', ''))
+    kept = [
+        row for row in _load_lessons()
+        if row.get('turma', '').strip() not in turmas
+    ]
+    return kept + new_rows
+
+
+def _save_upload_dataset(key, rows, user, students_context=None):
+    if has_full_data_access(user['role']):
+        if key == 'students':
+            _save_students(rows)
+        else:
+            _save_lessons(rows)
+        return
+
+    if key == 'students':
+        _save_students(_merge_teacher_students(rows, user))
+        return
+
+    students = students_context if students_context is not None else _load_students()
+    _save_lessons(_merge_teacher_lessons(rows, user, students))
+
+
+def _teacher_template_rows(name, user):
+    if name == 'students':
+        row = dict(TEMPLATE_ROWS['students'])
+        row['teacher'] = user.get('teacher_name') or row.get('teacher', '')
+        return [row]
+    all_students = _load_students()
+    turmas = teacher_turmas(all_students, user.get('teacher_name', ''))
+    if turmas:
+        return [r for r in LESSON_TEMPLATE_ROWS if r.get('turma', '').strip() in turmas]
+    return [dict(LESSON_TEMPLATE_ROWS[0])]
+
+
 def _current_user():
     user_id = session.get('user_id')
     if not user_id:
@@ -539,7 +631,8 @@ def inject_auth():
         'current_user': user,
         'role_labels': ROLE_LABELS,
         'can_manage_teachers': can_manage_teachers(user['role']) if user else False,
-        'can_upload_csv': has_full_data_access(user['role']) if user else False,
+        'can_upload_csv': bool(user),
+        'can_upload_all_csv': has_full_data_access(user['role']) if user else False,
     }
 
 
@@ -930,11 +1023,16 @@ def upload():
     user = _current_user()
     messages, errors = _pull_upload_notices()
     if request.method == 'POST':
-        if not has_full_data_access(user['role']):
-            abort(403)
-        for key, label in [('students', 'Alunos'), ('lessons', 'Aulas')]:
-            f = request.files.get(key)
-            if f and f.filename:
+        scope_errors = _teacher_scope_errors(user)
+        if scope_errors:
+            errors.extend(scope_errors)
+        else:
+            students_after_upload = _load_students()
+            for key, label in [('students', 'Alunos'), ('lessons', 'Aulas')]:
+                f = request.files.get(key)
+                if not (f and f.filename):
+                    continue
+
                 text, decode_error = _read_csv_text(f)
                 if decode_error:
                     errors.append(f'Erro no CSV de {label}: {decode_error}')
@@ -945,12 +1043,22 @@ def upload():
                     errors.append(f'Erro no CSV de {label}: {validation_errors[0]}')
                     continue
 
-                try:
-                    rows = _csv_rows_from_text(text)
+                rows = _csv_rows_from_text(text)
+                if not has_full_data_access(user['role']):
                     if key == 'students':
-                        _save_students(rows)
+                        validation_errors = _validate_teacher_student_rows(rows, user)
                     else:
-                        _save_lessons(rows)
+                        validation_errors = _validate_teacher_lesson_rows(
+                            rows, user, students_after_upload,
+                        )
+                    if validation_errors:
+                        errors.append(f'Erro no CSV de {label}: {validation_errors[0]}')
+                        continue
+
+                try:
+                    _save_upload_dataset(key, rows, user, students_after_upload)
+                    if key == 'students':
+                        students_after_upload = _load_students()
                     messages.append(f'{label} carregado: {f.filename}')
                 except OSError as exc:
                     errors.append(f'Erro ao salvar {label}: {exc}')
@@ -964,6 +1072,7 @@ def upload():
         lessons_exists = bool(filter_lessons_for_user(all_lessons, all_students, user))
     return render_template('upload.html', messages=messages, errors=errors,
         can_delete_all_csv=has_full_data_access(user['role']),
+        is_teacher_upload=not has_full_data_access(user['role']),
         students_exists=students_exists, lessons_exists=lessons_exists,
         student_template_rows=_load_template_rows('students'),
         lesson_template_rows=_load_template_rows('lessons'),
@@ -995,12 +1104,25 @@ def delete_csv(name):
 
 
 @app.route('/upload/template/<name>')
-@role_required(ROLE_SUPERADMIN, ROLE_ADMIN)
+@login_required
 def download_template(name):
     if name not in ('students', 'lessons'):
         abort(404)
 
-    buf = _build_template_csv(name)
+    user = _current_user()
+    if has_full_data_access(user['role']):
+        buf = _build_template_csv(name)
+    else:
+        scope_errors = _teacher_scope_errors(user)
+        if scope_errors:
+            abort(403)
+        fields = STUDENT_FIELDS if name == 'students' else LESSON_FIELDS
+        rows = _teacher_template_rows(name, user)
+        buf = io.StringIO()
+        writer = csv.DictWriter(buf, fieldnames=fields, extrasaction='ignore')
+        writer.writeheader()
+        writer.writerows(rows)
+        buf = '\ufeff' + buf.getvalue()
     data = io.BytesIO(buf.encode('utf-8'))
     data.seek(0)
     return send_file(
@@ -1012,12 +1134,26 @@ def download_template(name):
 
 
 @app.route('/upload/download/<name>')
-@role_required(ROLE_SUPERADMIN, ROLE_ADMIN)
+@login_required
 def download_csv(name):
     if name not in ('students', 'lessons'):
         abort(404)
+    user = _current_user()
     if db_store:
-        rows = _load_students() if name == 'students' else _load_lessons()
+        all_students = _load_students()
+        if name == 'students':
+            rows = (
+                _load_students()
+                if has_full_data_access(user['role'])
+                else filter_students_for_user(all_students, user)
+            )
+        else:
+            all_lessons = _load_lessons()
+            rows = (
+                all_lessons
+                if has_full_data_access(user['role'])
+                else filter_lessons_for_user(all_lessons, all_students, user)
+            )
         if not rows:
             abort(404)
         fields = STUDENT_FIELDS if name == 'students' else LESSON_FIELDS
@@ -1032,7 +1168,25 @@ def download_csv(name):
     path = DATA_DIR / f'{name}.csv'
     if not path.exists():
         abort(404)
-    return send_file(path, as_attachment=True, download_name=f'{name}.csv')
+    if has_full_data_access(user['role']):
+        return send_file(path, as_attachment=True, download_name=f'{name}.csv')
+
+    all_students = load_csv(DATA_DIR / 'students.csv') if (DATA_DIR / 'students.csv').exists() else []
+    all_lessons = load_csv(path) if name == 'lessons' else []
+    if name == 'students':
+        rows = filter_students_for_user(all_students, user)
+    else:
+        rows = filter_lessons_for_user(all_lessons, all_students, user)
+    if not rows:
+        abort(404)
+    fields = STUDENT_FIELDS if name == 'students' else LESSON_FIELDS
+    buf = io.StringIO()
+    writer = csv.DictWriter(buf, fieldnames=fields, extrasaction='ignore')
+    writer.writeheader()
+    writer.writerows(rows)
+    data = io.BytesIO(buf.getvalue().encode('utf-8'))
+    data.seek(0)
+    return send_file(data, as_attachment=True, download_name=f'{name}.csv', mimetype='text/csv')
 
 
 # ── Generate & Reports ────────────────────────────────────────────────────────────────

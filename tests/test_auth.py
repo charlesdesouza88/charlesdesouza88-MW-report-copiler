@@ -1,3 +1,5 @@
+import io
+
 import app as web_app
 from auth import (
     ROLE_SUPERADMIN,
@@ -85,7 +87,7 @@ def test_user_store_create_teacher(tmp_path):
     assert user['teacher_name'] == 'Chuck'
 
 
-def test_teacher_can_view_upload_but_not_import(monkeypatch, tmp_path):
+def test_teacher_can_upload_scoped_csv(monkeypatch, tmp_path):
     data_dir = tmp_path / 'data'
     data_dir.mkdir()
     out_dir = tmp_path / 'output'
@@ -101,11 +103,29 @@ def test_teacher_can_view_upload_but_not_import(monkeypatch, tmp_path):
     monkeypatch.setattr(web_app, 'SUPERADMIN_EMAIL', '')
     monkeypatch.setattr(web_app, 'SUPERADMIN_PASSWORD', '')
 
+    students_csv = (
+        'teacher,turma,turma_display,nivel,horario,student_name,participacao,comportamento,'
+        'speaking,listening,foco,writing,reading,gramatica,trabalho_equipe,organizacao,'
+        'pontualidade,respeito_regras,faltas,missed_aulas,aula_extra,feedback_participacao,'
+        'feedback_foco,feedback_trabalho_equipe,recomendacoes,observacao\n'
+        'Chuck,MASTER,Masters,,,Jane Doe,,,,,,,,,,,,,,,,,,,,\n'
+    )
+
     client = web_app.app.test_client()
     client.post('/login', data={'email': 't@test.local', 'password': 'pass123'})
     assert client.get('/upload').status_code == 200
-    assert client.get('/upload/template/students').status_code == 403
-    assert client.post('/upload').status_code == 403
+    assert client.get('/upload/template/students').status_code == 200
+    response = client.post(
+        '/upload',
+        data={'students': (io.BytesIO(students_csv.encode()), 'students.csv')},
+        content_type='multipart/form-data',
+        follow_redirects=True,
+    )
+    assert response.status_code == 200
+    assert b'Alunos carregado' in response.data
+    saved = (data_dir / 'students.csv').read_text(encoding='utf-8')
+    assert 'Jane Doe' in saved
+    assert 'teacher,turma' in saved
 
 
 def test_teacher_turmas():

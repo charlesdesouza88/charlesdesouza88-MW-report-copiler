@@ -73,6 +73,12 @@
 <div class="alert alert-success">✓ &nbsp;{{ msg }}</div>
 {% endfor %}
 
+{% if is_teacher_upload and current_user %}
+<div class="alert" style="background:#F5EEF8; color:#4A1F7C; border:1px solid #D8C8EB; margin-bottom:16px;">
+  Você envia apenas os dados do professor <strong>{{ current_user.teacher_name }}</strong>. Outros professores e turmas deles não são alterados.
+</div>
+{% endif %}
+
 <div class="layout-2col layout-2col-tight">
 
   <!-- Students CSV -->
@@ -122,23 +128,11 @@
         {% if students_exists %}
         <a href="{{ url_for('download_csv', name='students') }}" class="btn btn-ghost btn-sm">↓ Baixar atual</a>
         <form method="post" action="{{ url_for('delete_csv', name='students') }}" style="display:inline; margin:0;"
-              onsubmit="return confirm('Remover students.csv e todos os alunos? Esta ação não pode ser desfeita.');">
-          <button type="submit" class="btn btn-danger btn-sm">✕ Remover dados</button>
+              onsubmit="return confirm('{% if can_upload_all_csv %}Remover students.csv e todos os alunos? Esta ação não pode ser desfeita.{% else %}Remover todos os seus alunos importados? Outros professores não serão afetados.{% endif %}');">
+          <button type="submit" class="btn btn-danger btn-sm">{% if can_upload_all_csv %}✕ Remover dados{% else %}✕ Remover meus alunos{% endif %}</button>
         </form>
         {% endif %}
       </div>
-      {% else %}
-      <div style="padding:14px; border-radius:10px; background:#F5EEF8; font-size:12px; line-height:1.55; color:#444; margin-bottom:16px;">
-        Apenas administradores podem enviar novos arquivos CSV. Você pode <strong>remover os dados importados do seu perfil</strong> com o botão abaixo (se houver dados carregados).
-      </div>
-      {% if students_exists %}
-      <form method="post" action="{{ url_for('delete_csv', name='students') }}" style="margin-bottom:16px;"
-            onsubmit="return confirm('Remover todos os seus alunos importados? Outros professores não serão afetados.');">
-        <button type="submit" class="btn btn-danger btn-sm">✕ Remover meus alunos</button>
-      </form>
-      {% else %}
-      <p class="font-sm text-gray" style="margin-bottom:16px;">Nenhum aluno carregado para o seu perfil. Peça ao admin para importar o CSV ou use a página <a href="{{ url_for('students') }}">Alunos</a>.</p>
-      {% endif %}
       {% endif %}
 
       <div style="border-top:1px solid #EEE; padding-top:16px;">
@@ -228,21 +222,11 @@
         {% if lessons_exists %}
         <a href="{{ url_for('download_csv', name='lessons') }}" class="btn btn-ghost btn-sm">↓ Baixar atual</a>
         <form method="post" action="{{ url_for('delete_csv', name='lessons') }}" style="display:inline; margin:0;"
-              onsubmit="return confirm('Remover lessons.csv e todas as aulas? Esta ação não pode ser desfeita.');">
-          <button type="submit" class="btn btn-danger btn-sm">✕ Remover dados</button>
+              onsubmit="return confirm('{% if can_upload_all_csv %}Remover lessons.csv e todas as aulas? Esta ação não pode ser desfeita.{% else %}Remover todas as aulas das suas turmas? Outras turmas não serão afetadas.{% endif %}');">
+          <button type="submit" class="btn btn-danger btn-sm">{% if can_upload_all_csv %}✕ Remover dados{% else %}✕ Remover minhas aulas{% endif %}</button>
         </form>
         {% endif %}
       </div>
-      {% else %}
-      <div style="padding:14px; border-radius:10px; background:#F5EEF8; font-size:12px; line-height:1.55; color:#444; margin-bottom:16px;">
-        Apenas administradores podem enviar novos arquivos CSV. Você pode remover as aulas das <strong>suas turmas</strong> com o botão abaixo.
-      </div>
-      {% if lessons_exists %}
-      <form method="post" action="{{ url_for('delete_csv', name='lessons') }}"
-            onsubmit="return confirm('Remover todas as aulas das suas turmas? Outras turmas não serão afetadas.');">
-        <button type="submit" class="btn btn-danger btn-sm">✕ Remover minhas aulas</button>
-      </form>
-      {% endif %}
       {% endif %}
 
       <div style="border-top:1px solid #EEE; padding-top:16px;">
