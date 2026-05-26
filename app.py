@@ -539,6 +539,7 @@ def inject_auth():
         'current_user': user,
         'role_labels': ROLE_LABELS,
         'can_manage_teachers': can_manage_teachers(user['role']) if user else False,
+        'can_upload_csv': has_full_data_access(user['role']) if user else False,
     }
 
 
@@ -588,6 +589,69 @@ def _csv_rows_from_text(text):
         if any(row.values()):
             rows.append(row)
     return rows
+
+
+def _queue_upload_notice(message=None, error=None):
+    if message:
+        messages = list(session.get('upload_messages', []))
+        messages.append(message)
+        session['upload_messages'] = messages
+    if error:
+        errors = list(session.get('upload_errors', []))
+        errors.append(error)
+        session['upload_errors'] = errors
+
+
+def _pull_upload_notices():
+    messages = session.pop('upload_messages', [])
+    errors = session.pop('upload_errors', [])
+    return messages, errors
+
+
+def _delete_csv_dataset(name, user):
+    """Remove uploaded CSV data. Admins clear all; teachers only their rows."""
+    if name not in ('students', 'lessons'):
+        abort(404)
+
+    if has_full_data_access(user['role']):
+        if db_store:
+            if name == 'students':
+                before = len(_load_students())
+                _save_students([])
+            else:
+                before = len(_load_lessons())
+                _save_lessons([])
+        else:
+            path = DATA_DIR / f'{name}.csv'
+            before = len(load_csv(path)) if path.exists() else 0
+            if path.exists():
+                path.unlink()
+        return before, True
+
+    teacher_key = normalize_teacher_name(user.get('teacher_name', '')).casefold()
+    if not teacher_key:
+        return 0, False
+
+    if name == 'students':
+        all_rows = _load_students()
+        kept = [
+            row for row in all_rows
+            if normalize_teacher_name(row.get('teacher', '')).casefold() != teacher_key
+        ]
+        removed = len(all_rows) - len(kept)
+        _save_students(kept)
+        return removed, False
+
+    all_students = _load_students()
+    turmas = teacher_turmas(all_students, user.get('teacher_name', ''))
+    all_lessons = _load_lessons()
+    kept = [
+        row for row in all_lessons
+        if row.get('turma', '').strip() not in turmas
+    ]
+    removed = len(all_lessons) - len(kept)
+    _save_lessons(kept)
+    return removed, False
 
 
 # ── Auth ─────────────────────────────────────────────────────────────────────────────
@@ -861,11 +925,13 @@ def lesson_delete(idx):
 # ── Upload ────────────────────────────────────────────────────────────────────────────
 
 @app.route('/upload', methods=['GET', 'POST'])
-@role_required(ROLE_SUPERADMIN, ROLE_ADMIN)
+@login_required
 def upload():
-    messages = []
-    errors = []
+    user = _current_user()
+    messages, errors = _pull_upload_notices()
     if request.method == 'POST':
+        if not has_full_data_access(user['role']):
+            abort(403)
         for key, label in [('students', 'Alunos'), ('lessons', 'Aulas')]:
             f = request.files.get(key)
             if f and f.filename:
@@ -888,13 +954,16 @@ def upload():
                     messages.append(f'{label} carregado: {f.filename}')
                 except OSError as exc:
                     errors.append(f'Erro ao salvar {label}: {exc}')
-    if db_store:
-        students_exists = bool(_load_students())
-        lessons_exists = bool(_load_lessons())
+    all_students = _load_students()
+    all_lessons = _load_lessons()
+    if has_full_data_access(user['role']):
+        students_exists = bool(all_students) if db_store else (DATA_DIR / 'students.csv').exists()
+        lessons_exists = bool(all_lessons) if db_store else (DATA_DIR / 'lessons.csv').exists()
     else:
-        students_exists = (DATA_DIR / 'students.csv').exists()
-        lessons_exists = (DATA_DIR / 'lessons.csv').exists()
+        students_exists = bool(filter_students_for_user(all_students, user))
+        lessons_exists = bool(filter_lessons_for_user(all_lessons, all_students, user))
     return render_template('upload.html', messages=messages, errors=errors,
+        can_delete_all_csv=has_full_data_access(user['role']),
         students_exists=students_exists, lessons_exists=lessons_exists,
         student_template_rows=_load_template_rows('students'),
         lesson_template_rows=_load_template_rows('lessons'),
@@ -907,6 +976,22 @@ def upload():
         lesson_preview_columns=_lesson_preview_columns(),
         score_fields=sorted(SCORE_FIELDS),
     )
+
+
+@app.route('/upload/delete/<name>', methods=['POST'])
+@login_required
+def delete_csv(name):
+    user = _current_user()
+    removed, full_delete = _delete_csv_dataset(name, user)
+    label = 'Alunos' if name == 'students' else 'Aulas'
+    if removed == 0:
+        _queue_upload_notice(error=f'Nenhum dado de {label.lower()} para remover.')
+    elif full_delete:
+        _queue_upload_notice(message=f'{label}: arquivo CSV removido ({removed} registro(s)).')
+    else:
+        _queue_upload_notice(
+            message=f'{label}: {removed} registro(s) do seu perfil removido(s).')
+    return redirect(url_for('upload'))
 
 
 @app.route('/upload/template/<name>')

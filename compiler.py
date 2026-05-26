@@ -55,6 +55,46 @@ def axis_endpoints(cx=100, cy=105, max_r=78):
     return eps
 
 
+# Display order for class diagnostic skill columns: (label, dev_scores index)
+# dev_scores axis order: Audição(0), Fala(1), Gramática(2), Escrita(3), Leitura(4)
+SKILL_COLUMN_DEFS = [
+    ('Fala', 1),
+    ('Audição', 0),
+    ('Escrita', 3),
+    ('Leitura', 4),
+    ('Gramática', 2),
+]
+
+
+def mini_radar_spoke_chart(dev_scores, highlight_axis, cx=34, cy=36, max_r=24):
+    """Small pentagon web chart with one axis highlighted (for per-skill columns)."""
+    score = int_score(dev_scores[highlight_axis])
+    angle = -math.pi / 2 + highlight_axis * 2 * math.pi / 5
+    r = (float(score) / 5.0) * max_r
+    hx = round(cx + r * math.cos(angle), 2)
+    hy = round(cy + r * math.sin(angle), 2)
+    return dict(
+        grid=pentagon_grid(cx, cy, max_r),
+        axes=axis_endpoints(cx, cy, max_r),
+        pentagon=pentagon_polygon(dev_scores, cx, cy, max_r),
+        center=(cx, cy),
+        highlight_tip=(hx, hy),
+        highlight_axis=highlight_axis,
+    )
+
+
+def skill_column_charts(dev_scores):
+    return [
+        dict(
+            label=label,
+            axis_index=axis_index,
+            score=int_score(dev_scores[axis_index]),
+            mini=mini_radar_spoke_chart(dev_scores, axis_index),
+        )
+        for label, axis_index in SKILL_COLUMN_DEFS
+    ]
+
+
 def pie_path(percentage, cx=58, cy=58, r=48):
     """Return (svg_path_d, is_full_circle) for a clockwise attendance pie slice."""
     pct = float(percentage)
@@ -185,6 +225,7 @@ def build_student_ctx(s, all_lessons):
         pentagon=pentagon_polygon(dev_scores),
         grid=pentagon_grid(),
         axes=axis_endpoints(),
+        skill_columns=skill_column_charts(dev_scores),
         comp_scores=comp_scores,
         comp_overall=comp_overall,
     )

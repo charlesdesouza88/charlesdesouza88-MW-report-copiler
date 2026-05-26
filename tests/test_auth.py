@@ -85,7 +85,7 @@ def test_user_store_create_teacher(tmp_path):
     assert user['teacher_name'] == 'Chuck'
 
 
-def test_teacher_cannot_access_upload(monkeypatch, tmp_path):
+def test_teacher_can_view_upload_but_not_import(monkeypatch, tmp_path):
     data_dir = tmp_path / 'data'
     data_dir.mkdir()
     out_dir = tmp_path / 'output'
@@ -103,8 +103,9 @@ def test_teacher_cannot_access_upload(monkeypatch, tmp_path):
 
     client = web_app.app.test_client()
     client.post('/login', data={'email': 't@test.local', 'password': 'pass123'})
-    response = client.get('/upload')
-    assert response.status_code == 403
+    assert client.get('/upload').status_code == 200
+    assert client.get('/upload/template/students').status_code == 403
+    assert client.post('/upload').status_code == 403
 
 
 def test_teacher_turmas():

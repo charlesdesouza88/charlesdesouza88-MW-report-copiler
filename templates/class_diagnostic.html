@@ -63,7 +63,7 @@ body {
 .skill-card {
   border: 2px solid #5B2D8E;
   border-radius: 8px;
-  padding: 10px 12px 12px;
+  padding: 12px 14px 14px;
   min-width: 0;
   display: flex;
   flex-direction: column;
@@ -78,18 +78,26 @@ body {
 }
 .skill-scores {
   display: flex;
-  gap: 6px;
-  margin-bottom: 10px;
+  gap: 8px;
+  margin-bottom: 0;
   justify-content: space-between;
+  align-items: flex-start;
 }
-.skill-score-item { text-align: center; flex: 1; min-width: 0; }
+.skill-score-item {
+  text-align: center;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
 .skill-bubble {
-  width: 40px;
-  height: 40px;
+  width: 52px;
+  height: 52px;
   border-radius: 50%;
   background: #5B2D8E;
   color: white;
-  font-size: 20px;
+  font-size: 26px;
   font-weight: 900;
   display: flex;
   align-items: center;
@@ -98,21 +106,23 @@ body {
   line-height: 1;
 }
 .skill-score-label {
-  font-size: 9px;
+  font-size: 10.5px;
   font-weight: 700;
-  margin-top: 5px;
+  margin-top: 6px;
+  margin-bottom: 6px;
   line-height: 1.2;
   color: #333;
 }
-.mini-radar {
-  display: flex;
-  justify-content: center;
-  margin-top: auto;
+.skill-mini-web {
+  width: 100%;
+  margin-top: 2px;
 }
-.mini-radar svg {
-  width: 130px;
-  height: 130px;
+.skill-mini-web svg {
+  width: 76px;
+  height: 80px;
   max-width: 100%;
+  display: block;
+  margin: 0 auto;
 }
 
 .dev-table { width: 100%; border-collapse: collapse; margin-bottom: 10px; }
@@ -177,17 +187,18 @@ body {
   }
   .skill-cards { grid-template-columns: 1fr; }
   .skill-card { width: 100%; max-width: 100%; }
-  .skill-bubble { width: 44px; height: 44px; font-size: 22px; }
-  .skill-score-label { font-size: 10px; }
-  .mini-radar svg { width: 160px; height: 160px; }
+  .skill-bubble { width: 48px; height: 48px; font-size: 24px; }
+  .skill-score-label { font-size: 10.5px; }
+  .skill-mini-web svg { width: 80px; height: 84px; }
   .dates-grid { grid-template-columns: 1fr; }
   .profile-table, .dev-table { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; }
 }
 @media print {
   body { width: 277mm; background: #fff; padding: 0; }
   .skill-cards { grid-template-columns: repeat(4, 1fr); }
-  .skill-bubble { width: 42px; height: 42px; font-size: 21px; }
-  .mini-radar svg { width: 125px; height: 125px; }
+  .skill-bubble { width: 52px; height: 52px; font-size: 26px; }
+  .skill-score-label { font-size: 10.5px; }
+  .skill-mini-web svg { width: 72px; height: 76px; }
 }
 </style>
 </head>
@@ -240,37 +251,39 @@ body {
   <div class="skill-card">
     <div class="skill-card-name">{{ sd.student.student_name.split()[0] }} {{ sd.student.student_name.split()[-1] }}</div>
     <div class="skill-scores">
+      {% for col in sd.skill_columns %}
       <div class="skill-score-item">
-        <div class="skill-bubble">{{ sd.dev_scores[1] }}</div>
-        <div class="skill-score-label">Fala</div>
+        <div class="skill-bubble">{{ col.score }}</div>
+        <div class="skill-score-label">{{ col.label }}</div>
+        <div class="skill-mini-web">
+          <svg viewBox="0 0 68 72" font-family="Arial" role="img" aria-label="{{ col.label }}: {{ col.score }} de 5">
+            {% for ring in col.mini.grid %}
+            <polygon points="{{ ring }}" fill="none" stroke="#C8C8C8" stroke-width="1.2"/>
+            {% endfor %}
+            {% for ep in col.mini.axes %}
+            <line x1="{{ col.mini.center[0] }}" y1="{{ col.mini.center[1] }}" x2="{{ ep[0] }}" y2="{{ ep[1] }}" stroke="#D0D0D0" stroke-width="1"/>
+            {% endfor %}
+            <polygon points="{{ col.mini.pentagon }}" fill="rgba(91,45,142,0.18)" stroke="#9B7BB8" stroke-width="1.2"/>
+            <line
+              x1="{{ col.mini.center[0] }}" y1="{{ col.mini.center[1] }}"
+              x2="{{ col.mini.highlight_tip[0] }}" y2="{{ col.mini.highlight_tip[1] }}"
+              stroke="#5B2D8E" stroke-width="2.8" stroke-linecap="round"
+            />
+            <circle cx="{{ col.mini.highlight_tip[0] }}" cy="{{ col.mini.highlight_tip[1] }}" r="3.2" fill="#5B2D8E"/>
+            {% for level in range(1, 6) %}
+            <text
+              x="{{ col.mini.center[0] }}"
+              y="{{ col.mini.center[1] - (level / 5.0) * 24 + 3.5 }}"
+              text-anchor="middle"
+              font-size="6.5"
+              font-weight="bold"
+              fill="#888"
+            >{{ level }}</text>
+            {% endfor %}
+          </svg>
+        </div>
       </div>
-      <div class="skill-score-item">
-        <div class="skill-bubble">{{ sd.dev_scores[0] }}</div>
-        <div class="skill-score-label">Audição</div>
-      </div>
-      <div class="skill-score-item">
-        <div class="skill-bubble">{{ sd.dev_scores[3] }}</div>
-        <div class="skill-score-label">Escrita</div>
-      </div>
-      <div class="skill-score-item">
-        <div class="skill-bubble">{{ sd.dev_scores[4] }}</div>
-        <div class="skill-score-label">Leitura</div>
-      </div>
-      <div class="skill-score-item">
-        <div class="skill-bubble">{{ sd.dev_scores[2] }}</div>
-        <div class="skill-score-label">Gramática</div>
-      </div>
-    </div>
-    <div class="mini-radar">
-      <svg viewBox="-5 5 210 205" font-family="Arial" role="img" aria-hidden="true">
-        {% for ring in grid %}
-        <polygon points="{{ ring }}" fill="none" stroke="#EEE" stroke-width="1.5"/>
-        {% endfor %}
-        {% for ep in axes %}
-        <line x1="100" y1="105" x2="{{ ep[0] }}" y2="{{ ep[1] }}" stroke="#EEE" stroke-width="1"/>
-        {% endfor %}
-        <polygon points="{{ sd.pentagon }}" fill="rgba(91,45,142,0.25)" stroke="#5B2D8E" stroke-width="2.5"/>
-      </svg>
+      {% endfor %}
     </div>
   </div>
   {% endfor %}

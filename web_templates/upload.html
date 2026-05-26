@@ -105,6 +105,7 @@
     </div>
 
     <div style="padding:20px;">
+      {% if can_upload_csv %}
       <form method="post" enctype="multipart/form-data">
         <label class="file-dropzone" aria-label="Selecionar arquivo CSV de alunos">
           <div style="width:54px; height:54px; border-radius:16px; background:#fff; color:#5B2D8E; font-size:26px; display:flex; align-items:center; justify-content:center; margin:0 auto 10px; box-shadow:0 8px 24px rgba(91,45,142,0.08);">↑</div>
@@ -114,14 +115,31 @@
                  onchange="this.closest('form').querySelector('.file-name').textContent = this.files[0]?.name || ''">
           <div class="file-name" style="min-height:18px; color:#5B2D8E; font-size:12px; font-weight:800;"></div>
         </label>
-        <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:16px;">
-          <button type="submit" class="btn btn-primary btn-sm" style="flex:1; min-width:150px; justify-content:center;">↑ Fazer upload</button>
-          <a href="{{ url_for('download_template', name='students') }}" class="btn btn-outline btn-sm" style="justify-content:center;">⇩ Baixar template</a>
-          {% if students_exists %}
-          <a href="{{ url_for('download_csv', name='students') }}" class="btn btn-ghost btn-sm">↓ Baixar atual</a>
-          {% endif %}
-        </div>
+        <button type="submit" class="btn btn-primary btn-sm" style="width:100%; justify-content:center; margin-bottom:12px;">↑ Fazer upload</button>
       </form>
+      <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:16px;">
+        <a href="{{ url_for('download_template', name='students') }}" class="btn btn-outline btn-sm" style="justify-content:center;">⇩ Baixar template</a>
+        {% if students_exists %}
+        <a href="{{ url_for('download_csv', name='students') }}" class="btn btn-ghost btn-sm">↓ Baixar atual</a>
+        <form method="post" action="{{ url_for('delete_csv', name='students') }}" style="display:inline; margin:0;"
+              onsubmit="return confirm('Remover students.csv e todos os alunos? Esta ação não pode ser desfeita.');">
+          <button type="submit" class="btn btn-danger btn-sm">✕ Remover dados</button>
+        </form>
+        {% endif %}
+      </div>
+      {% else %}
+      <div style="padding:14px; border-radius:10px; background:#F5EEF8; font-size:12px; line-height:1.55; color:#444; margin-bottom:16px;">
+        Apenas administradores podem enviar novos arquivos CSV. Você pode <strong>remover os dados importados do seu perfil</strong> com o botão abaixo (se houver dados carregados).
+      </div>
+      {% if students_exists %}
+      <form method="post" action="{{ url_for('delete_csv', name='students') }}" style="margin-bottom:16px;"
+            onsubmit="return confirm('Remover todos os seus alunos importados? Outros professores não serão afetados.');">
+        <button type="submit" class="btn btn-danger btn-sm">✕ Remover meus alunos</button>
+      </form>
+      {% else %}
+      <p class="font-sm text-gray" style="margin-bottom:16px;">Nenhum aluno carregado para o seu perfil. Peça ao admin para importar o CSV ou use a página <a href="{{ url_for('students') }}">Alunos</a>.</p>
+      {% endif %}
+      {% endif %}
 
       <div style="border-top:1px solid #EEE; padding-top:16px;">
         <div style="font-size:12px; font-weight:900; color:#5B2D8E; margin-bottom:8px; text-transform:uppercase; letter-spacing:0.7px;">Visual do template</div>
@@ -193,6 +211,7 @@
     </div>
 
     <div style="padding:20px;">
+      {% if can_upload_csv %}
       <form method="post" enctype="multipart/form-data">
         <label class="file-dropzone" aria-label="Selecionar arquivo CSV de aulas">
           <div style="width:54px; height:54px; border-radius:16px; background:#fff; color:#5B2D8E; font-size:26px; display:flex; align-items:center; justify-content:center; margin:0 auto 10px; box-shadow:0 8px 24px rgba(91,45,142,0.08);">⇪</div>
@@ -202,14 +221,29 @@
                  onchange="this.closest('form').querySelector('.file-name').textContent = this.files[0]?.name || ''">
           <div class="file-name" style="min-height:18px; color:#5B2D8E; font-size:12px; font-weight:800;"></div>
         </label>
-        <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:16px;">
-          <button type="submit" class="btn btn-primary btn-sm" style="flex:1; min-width:150px; justify-content:center;">↑ Fazer upload</button>
-          <a href="{{ url_for('download_template', name='lessons') }}" class="btn btn-outline btn-sm" style="justify-content:center;">⇩ Baixar template</a>
-          {% if lessons_exists %}
-          <a href="{{ url_for('download_csv', name='lessons') }}" class="btn btn-ghost btn-sm">↓ Baixar atual</a>
-          {% endif %}
-        </div>
+        <button type="submit" class="btn btn-primary btn-sm" style="width:100%; justify-content:center; margin-bottom:12px;">↑ Fazer upload</button>
       </form>
+      <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:16px;">
+        <a href="{{ url_for('download_template', name='lessons') }}" class="btn btn-outline btn-sm" style="justify-content:center;">⇩ Baixar template</a>
+        {% if lessons_exists %}
+        <a href="{{ url_for('download_csv', name='lessons') }}" class="btn btn-ghost btn-sm">↓ Baixar atual</a>
+        <form method="post" action="{{ url_for('delete_csv', name='lessons') }}" style="display:inline; margin:0;"
+              onsubmit="return confirm('Remover lessons.csv e todas as aulas? Esta ação não pode ser desfeita.');">
+          <button type="submit" class="btn btn-danger btn-sm">✕ Remover dados</button>
+        </form>
+        {% endif %}
+      </div>
+      {% else %}
+      <div style="padding:14px; border-radius:10px; background:#F5EEF8; font-size:12px; line-height:1.55; color:#444; margin-bottom:16px;">
+        Apenas administradores podem enviar novos arquivos CSV. Você pode remover as aulas das <strong>suas turmas</strong> com o botão abaixo.
+      </div>
+      {% if lessons_exists %}
+      <form method="post" action="{{ url_for('delete_csv', name='lessons') }}"
+            onsubmit="return confirm('Remover todas as aulas das suas turmas? Outras turmas não serão afetadas.');">
+        <button type="submit" class="btn btn-danger btn-sm">✕ Remover minhas aulas</button>
+      </form>
+      {% endif %}
+      {% endif %}
 
       <div style="border-top:1px solid #EEE; padding-top:16px;">
         <div style="font-size:12px; font-weight:900; color:#5B2D8E; margin-bottom:8px; text-transform:uppercase; letter-spacing:0.7px;">Visual do template</div>

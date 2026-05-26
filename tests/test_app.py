@@ -31,12 +31,22 @@ def _init_user_store(monkeypatch, data_dir):
     monkeypatch.setattr(web_app, "SUPERADMIN_PASSWORD", "testpass")
 
 
-def _login(client):
+def _login(client, email="admin@test.local", password="testpass"):
     return client.post(
         "/login",
-        data={"email": "admin@test.local", "password": "testpass"},
+        data={"email": email, "password": password},
         follow_redirects=False,
     )
+
+
+def _init_teacher_store(monkeypatch, data_dir, teacher_name="Chuck"):
+    from auth import UserStore
+
+    store = UserStore(db_store=None, json_path=data_dir / "users.json")
+    store.initialize()
+    store.ensure_bootstrap_superadmin("admin@test.local", "testpass")
+    store.create_teacher("teacher@test.local", "teachpass", teacher_name)
+    monkeypatch.setattr(web_app, "user_store", store)
 
 
 def test_health_returns_ok():
@@ -348,3 +358,69 @@ def test_upload_template_lessons_download(monkeypatch, tmp_path):
     assert response.data.startswith(b"\xef\xbb\xbf")
     assert b"turma,aula_num,date,licao_conteudo" in response.data
     assert b"MASTER,2," in response.data
+
+
+def test_admin_delete_students_csv(monkeypatch, tmp_path):
+    data_dir = tmp_path / "data"
+    data_dir.mkdir()
+    (data_dir / "students.csv").write_text(_students_csv(), encoding="utf-8")
+
+    monkeypatch.setattr(web_app, "DATA_DIR", data_dir)
+    monkeypatch.setattr(web_app, "OUT_DIR", tmp_path / "output")
+    web_app.OUT_DIR.mkdir()
+    _init_user_store(monkeypatch, data_dir)
+
+    client = web_app.app.test_client()
+    _login(client)
+    response = client.post("/upload/delete/students", follow_redirects=True)
+
+    assert response.status_code == 200
+    assert not (data_dir / "students.csv").exists()
+    assert b"alert-success" in response.data
+    assert b"arquivo CSV removido" in response.data
+
+
+def test_teacher_delete_only_own_students(monkeypatch, tmp_path):
+    data_dir = tmp_path / "data"
+    data_dir.mkdir()
+    mixed = (
+        "teacher,turma,turma_display,nivel,horario,student_name,participacao,comportamento,speaking,listening,foco,writing,reading,gramatica,trabalho_equipe,organizacao,pontualidade,respeito_regras,faltas,missed_aulas,aula_extra,feedback_participacao,feedback_foco,feedback_trabalho_equipe,recomendacoes,observacao\n"
+        "Chuck,MASTER,Masters,Adults Book 4,Tue 19:00,Jane Doe,4,3,4,5,4,3,4,2,3,3,3,3,1,2,Reposicao,Good,Focus,Team,Practice speaking,\n"
+        "Barbara,SPARK,Spark,Teens,Tue 18:00,Bob Smith,3,3,3,3,3,3,3,3,3,3,3,3,0,0,,,,,,\n"
+    )
+    (data_dir / "students.csv").write_text(mixed, encoding="utf-8")
+
+    monkeypatch.setattr(web_app, "DATA_DIR", data_dir)
+    monkeypatch.setattr(web_app, "OUT_DIR", tmp_path / "output")
+    web_app.OUT_DIR.mkdir()
+    _init_teacher_store(monkeypatch, data_dir, teacher_name="Chuck")
+
+    client = web_app.app.test_client()
+    _login(client, email="teacher@test.local", password="teachpass")
+    response = client.post("/upload/delete/students", follow_redirects=True)
+
+    assert response.status_code == 200
+    assert b"1 registro(s) do seu perfil" in response.data
+    remaining = (data_dir / "students.csv").read_text(encoding="utf-8")
+    assert "Jane Doe" not in remaining
+    assert "Bob Smith" in remaining
+
+
+def test_teacher_cannot_upload_csv(monkeypatch, tmp_path):
+    data_dir = tmp_path / "data"
+    data_dir.mkdir()
+
+    monkeypatch.setattr(web_app, "DATA_DIR", data_dir)
+    monkeypatch.setattr(web_app, "OUT_DIR", tmp_path / "output")
+    web_app.OUT_DIR.mkdir()
+    _init_teacher_store(monkeypatch, data_dir)
+
+    client = web_app.app.test_client()
+    _login(client, email="teacher@test.local", password="teachpass")
+    response = client.post(
+        "/upload",
+        data={"students": (io.BytesIO(_students_csv().encode()), "students.csv")},
+        content_type="multipart/form-data",
+    )
+
+    assert response.status_code == 403
