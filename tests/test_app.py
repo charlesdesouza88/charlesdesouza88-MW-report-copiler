@@ -243,6 +243,65 @@ def test_upload_page_shows_csv_template_preview(monkeypatch, tmp_path):
     assert "Lesson 3: Past tense review" in html
 
 
+def test_lessons_page_and_teacher_scope(monkeypatch, tmp_path):
+    data_dir = tmp_path / "data"
+    data_dir.mkdir()
+    (data_dir / "students.csv").write_text(_students_csv(), encoding="utf-8")
+    (data_dir / "lessons.csv").write_text(
+        "turma,aula_num,date,licao_conteudo,atividade_extra,habilidades\n"
+        "MASTER,1,01/01,L1,,\n"
+        "OTHER,1,01/01,L9,,\n",
+        encoding="utf-8",
+    )
+
+    store = UserStore(db_store=None, json_path=data_dir / "users.json")
+    store.initialize()
+    store.create_teacher("chuck@test.local", "pass123", "Chuck")
+
+    monkeypatch.setattr(web_app, "DATA_DIR", data_dir)
+    monkeypatch.setattr(web_app, "OUT_DIR", tmp_path / "output")
+    web_app.OUT_DIR.mkdir()
+    monkeypatch.setattr(web_app, "user_store", store)
+    _init_user_store(monkeypatch, data_dir)
+
+    client = web_app.app.test_client()
+    client.post("/login", data={"email": "chuck@test.local", "password": "pass123"})
+    response = client.get("/lessons")
+    html = response.get_data(as_text=True)
+
+    assert response.status_code == 200
+    assert "MASTER" in html
+    assert "L9" not in html
+
+    create = client.post(
+        "/lessons/new",
+        data={
+            "turma": "MASTER",
+            "aula_num": "99",
+            "date": "01/05/2026",
+            "licao_conteudo": "Test lesson",
+            "atividade_extra": "",
+            "habilidades": "",
+        },
+        follow_redirects=True,
+    )
+    assert create.status_code == 200
+    assert "Test lesson" in create.get_data(as_text=True)
+
+    blocked = client.post(
+        "/lessons/new",
+        data={
+            "turma": "OTHER",
+            "aula_num": "1",
+            "date": "01/01",
+            "licao_conteudo": "Hack",
+            "atividade_extra": "",
+            "habilidades": "",
+        },
+    )
+    assert blocked.status_code == 403
+
+
 def test_teacher_sees_only_own_students(monkeypatch, tmp_path):
     data_dir = tmp_path / "data"
     data_dir.mkdir()

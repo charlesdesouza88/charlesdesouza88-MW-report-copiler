@@ -105,7 +105,11 @@
 {% else %}
 <div class="card" style="text-align:center; padding:48px;">
   <p class="text-gray" style="margin-bottom:16px;">Nenhum aluno cadastrado.</p>
+  {% if can_manage_teachers %}
   <a href="{{ url_for('upload') }}" class="btn btn-primary">↑ Fazer upload de CSV</a>
+  {% else %}
+  <a href="{{ url_for('lesson_new') }}" class="btn btn-primary">+ Cadastrar aula</a>
+  {% endif %}
 </div>
 {% endif %}
 

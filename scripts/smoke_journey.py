@@ -52,7 +52,7 @@ def main():
         print(f'[live] login -> {code}')
         if code not in (200, 302):
             sys.exit(1)
-        for path in ('/', '/students', '/upload', '/admin/teachers', '/reports'):
+        for path in ('/', '/students', '/lessons', '/upload', '/admin/teachers', '/reports'):
             r = opener.open(f'{base}{path}')
             print(f'[live] GET {path} -> {r.status}')
         print(f'PASS: live smoke OK for {base}')
@@ -63,7 +63,7 @@ def main():
 
     r = client.post('/login', data={'email': email, 'password': password})
     steps.append(('login', r.status_code == 302))
-    for path in ('/', '/students', '/upload', '/admin/teachers', '/reports'):
+    for path in ('/', '/students', '/lessons', '/upload', '/admin/teachers', '/reports'):
         r = client.get(path)
         steps.append((path, r.status_code == 200))
 

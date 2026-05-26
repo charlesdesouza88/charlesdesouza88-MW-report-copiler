@@ -1,0 +1,125 @@
+{% extends 'base.html' %}
+{% block title %}Aulas{% endblock %}
+{% block page_title %}Detalhes das aulas{% endblock %}
+
+{% block topbar_actions %}
+  <a href="{{ url_for('lesson_new') }}" class="btn btn-primary">+ Nova aula</a>
+{% endblock %}
+
+{% block content %}
+
+<p class="text-gray font-sm" style="margin-bottom:16px;">
+  Cadastre o conteúdo de cada aula por turma — os mesmos dados do arquivo <code>lessons.csv</code>.
+</p>
+
+{% if turmas %}
+<div class="filter-scroll mb-16" id="turma-filter">
+  <button class="btn btn-sm btn-primary filter-btn" data-turma="">Todas</button>
+  {% for t in turmas %}
+  <button class="btn btn-sm btn-ghost filter-btn" data-turma="{{ t }}">{{ t }}</button>
+  {% endfor %}
+</div>
+{% endif %}
+
+{% if lessons %}
+<div class="students-cards-view">
+  {% for lesson in lessons %}
+  <div class="student-card lesson-card-item" data-turma="{{ lesson.turma }}">
+    <div class="student-card-header">
+      <div>
+        <strong style="font-size:15px;">Aula {{ lesson.aula_num or '—' }}</strong>
+        <div class="font-sm text-gray" style="margin-top:4px;">{{ lesson.date or '—' }}</div>
+      </div>
+      <span class="tag">{{ lesson.turma }}</span>
+    </div>
+    <p class="font-sm" style="margin:10px 0 6px;"><strong>{{ lesson.licao_conteudo or '—' }}</strong></p>
+    {% if lesson.atividade_extra %}
+    <p class="font-sm text-gray" style="margin-bottom:6px;">Extra: {{ lesson.atividade_extra }}</p>
+    {% endif %}
+    {% if lesson.habilidades %}
+    <p class="font-sm text-gray">Habilidades: {{ lesson.habilidades }}</p>
+    {% endif %}
+    <div class="student-card-actions" style="margin-top:14px;">
+      <a href="{{ url_for('lesson_edit', idx=loop.index0) }}" class="btn btn-ghost btn-sm">Editar</a>
+      <form method="post" action="{{ url_for('lesson_delete', idx=loop.index0) }}"
+            onsubmit="return confirm('Excluir aula {{ lesson.aula_num }} da turma {{ lesson.turma }}?')">
+        <button type="submit" class="btn btn-danger btn-sm">Excluir</button>
+      </form>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<div class="table-wrap students-table-view">
+  <table>
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Turma</th>
+        <th>Aula</th>
+        <th>Data</th>
+        <th>Conteúdo</th>
+        <th>Atividade extra</th>
+        <th>Habilidades</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for lesson in lessons %}
+      <tr class="lesson-row" data-turma="{{ lesson.turma }}">
+        <td class="text-gray font-sm">{{ loop.index }}</td>
+        <td><span class="tag">{{ lesson.turma }}</span></td>
+        <td><strong>{{ lesson.aula_num or '—' }}</strong></td>
+        <td class="font-sm">{{ lesson.date or '—' }}</td>
+        <td class="font-sm">{{ lesson.licao_conteudo or '—' }}</td>
+        <td class="font-sm text-gray">{{ lesson.atividade_extra or '—' }}</td>
+        <td class="font-sm text-gray">{{ lesson.habilidades or '—' }}</td>
+        <td>
+          <div class="flex gap-8">
+            <a href="{{ url_for('lesson_edit', idx=loop.index0) }}" class="btn btn-ghost btn-xs">Editar</a>
+            <form method="post" action="{{ url_for('lesson_delete', idx=loop.index0) }}"
+                  onsubmit="return confirm('Excluir esta aula?')">
+              <button type="submit" class="btn btn-danger btn-xs">✕</button>
+            </form>
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="card" style="text-align:center; padding:48px;">
+  <p class="text-gray" style="margin-bottom:16px;">Nenhuma aula cadastrada para suas turmas.</p>
+  <a href="{{ url_for('lesson_new') }}" class="btn btn-primary">+ Cadastrar primeira aula</a>
+  {% if can_manage_teachers %}
+  <p class="font-sm text-gray" style="margin-top:16px;">ou importe via <a href="{{ url_for('upload') }}">Upload CSV</a></p>
+  {% endif %}
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+const params = new URLSearchParams(window.location.search);
+const initialTurma = params.get('turma');
+if (initialTurma) {
+  const preset = document.querySelector('.filter-btn[data-turma="' + initialTurma + '"]');
+  if (preset) preset.click();
+}
+
+document.querySelectorAll('.filter-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const turma = btn.dataset.turma;
+    document.querySelectorAll('.filter-btn').forEach(b => {
+      b.className = 'btn btn-sm btn-ghost filter-btn';
+    });
+    btn.className = 'btn btn-sm btn-primary filter-btn';
+    document.querySelectorAll('.lesson-row, .lesson-card-item').forEach(row => {
+      row.style.display = (!turma || row.dataset.turma === turma) ? '' : 'none';
+    });
+  });
+});
+</script>
+{% endblock %}

@@ -1,0 +1,67 @@
+{% extends 'base.html' %}
+{% block title %}{{ 'Nova aula' if is_new else 'Editar aula' }}{% endblock %}
+{% block page_title %}{{ 'Nova aula' if is_new else 'Editar aula — turma ' + (lesson.turma or '') }}{% endblock %}
+
+{% block topbar_actions %}
+  <a href="{{ url_for('lessons') }}" class="btn btn-ghost">← Voltar</a>
+{% endblock %}
+
+{% block content %}
+<form method="post" style="max-width: 720px;">
+
+  <div class="form-section">
+    <div class="form-section-title">Identificação da aula</div>
+    <div class="form-grid form-grid-2">
+      <div class="form-group">
+        <label>{{ lesson_field_labels.turma }} *</label>
+        {% if allowed_turmas and current_user and current_user.role == 'teacher' %}
+        <select name="turma" required>
+          {% for t in allowed_turmas %}
+          <option value="{{ t }}" {% if lesson.turma == t %}selected{% endif %}>{{ t }}</option>
+          {% endfor %}
+        </select>
+        {% elif allowed_turmas %}
+        <input type="text" name="turma" list="turma-list" value="{{ lesson.turma or '' }}" required placeholder="ex: MASTER">
+        <datalist id="turma-list">
+          {% for t in allowed_turmas %}
+          <option value="{{ t }}">
+          {% endfor %}
+        </datalist>
+        {% else %}
+        <input type="text" name="turma" value="{{ lesson.turma or '' }}" required placeholder="ex: MASTER">
+        <p class="font-sm text-gray" style="margin-top:6px;">Cadastre alunos primeiro para vincular turmas.</p>
+        {% endif %}
+      </div>
+      <div class="form-group">
+        <label>{{ lesson_field_labels.aula_num }} *</label>
+        <input type="text" name="aula_num" value="{{ lesson.aula_num or '' }}" required placeholder="1">
+      </div>
+      <div class="form-group">
+        <label>{{ lesson_field_labels.date }}</label>
+        <input type="text" name="date" value="{{ lesson.date or '' }}" placeholder="10/02/2026">
+      </div>
+    </div>
+  </div>
+
+  <div class="form-section">
+    <div class="form-section-title">Conteúdo</div>
+    <div class="form-group" style="margin-bottom:14px;">
+      <label>{{ lesson_field_labels.licao_conteudo }}</label>
+      <input type="text" name="licao_conteudo" value="{{ lesson.licao_conteudo or '' }}" placeholder="Lesson 1: Introductions">
+    </div>
+    <div class="form-group" style="margin-bottom:14px;">
+      <label>{{ lesson_field_labels.atividade_extra }}</label>
+      <input type="text" name="atividade_extra" value="{{ lesson.atividade_extra or '' }}" placeholder="Syllabus / pair work">
+    </div>
+    <div class="form-group">
+      <label>{{ lesson_field_labels.habilidades }}</label>
+      <input type="text" name="habilidades" value="{{ lesson.habilidades or '' }}" placeholder="Speaking, Listening">
+    </div>
+  </div>
+
+  <div class="form-actions-bar flex gap-8" style="margin-top:20px;">
+    <button type="submit" class="btn btn-primary">Salvar aula</button>
+    <a href="{{ url_for('lessons') }}" class="btn btn-ghost">Cancelar</a>
+  </div>
+</form>
+{% endblock %}

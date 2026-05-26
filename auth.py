@@ -124,6 +124,23 @@ def filter_reports_for_user(files, students, user):
     return [f for f in files if report_belongs_to_teacher(f.name, students, teacher_name)]
 
 
+def find_lesson_global_index(all_lessons, filtered_lessons, filtered_idx):
+    if filtered_idx < 0 or filtered_idx >= len(filtered_lessons):
+        return None
+    target = filtered_lessons[filtered_idx]
+    for i, row in enumerate(all_lessons):
+        if row is target:
+            return i
+    for i, row in enumerate(all_lessons):
+        if (
+            row.get('turma') == target.get('turma')
+            and row.get('aula_num') == target.get('aula_num')
+            and row.get('date') == target.get('date')
+        ):
+            return i
+    return None
+
+
 def find_student_global_index(all_students, filtered_students, filtered_idx):
     if filtered_idx < 0 or filtered_idx >= len(filtered_students):
         return None

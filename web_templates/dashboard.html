@@ -57,8 +57,11 @@
   <div class="card">
     <div class="section-title" style="margin-bottom:14px">Ações rápidas</div>
     <div style="display:flex; flex-direction:column; gap:10px;">
+      {% if can_manage_teachers %}
       <a href="{{ url_for('upload') }}" class="btn btn-outline" style="justify-content:center;">↑ &nbsp;Fazer upload de CSV</a>
+      {% endif %}
       <a href="{{ url_for('students') }}" class="btn btn-outline" style="justify-content:center;">◉ &nbsp;Gerenciar alunos</a>
+      <a href="{{ url_for('lessons') }}" class="btn btn-outline" style="justify-content:center;">▤ &nbsp;Detalhes das aulas</a>
       {% if data_ready %}
       <form method="post" action="{{ url_for('generate') }}">
         <button type="submit" class="btn btn-primary" style="width:100%; justify-content:center;">▶ &nbsp;Gerar todos os relatórios</button>
@@ -75,7 +78,10 @@
       {% for t in turmas %}
       <div style="display:flex; align-items:center; justify-content:space-between; padding: 8px 12px; background:#F4F2F8; border-radius:7px;">
         <span style="font-weight:900; font-size:13px;">{{ t }}</span>
-        <a href="{{ url_for('students') }}?turma={{ t }}" class="btn btn-ghost btn-xs">Ver alunos</a>
+        <div class="flex gap-8">
+          <a href="{{ url_for('students') }}?turma={{ t }}" class="btn btn-ghost btn-xs">Alunos</a>
+          <a href="{{ url_for('lessons') }}?turma={{ t }}" class="btn btn-ghost btn-xs">Aulas</a>
+        </div>
       </div>
       {% endfor %}
     </div>

@@ -21,8 +21,9 @@ from compiler import (generate_class_diagnostics, generate_individual_reports,
 from auth import (ROLE_ADMIN, ROLE_LABELS, ROLE_SUPERADMIN, ROLE_TEACHER,
                   UserStore, can_manage_teachers, filter_lessons_for_user,
                   filter_reports_for_user, filter_students_for_user,
-                  find_student_global_index, has_full_data_access,
-                  normalize_teacher_name, user_public_dict)
+                  find_lesson_global_index, find_student_global_index,
+                  has_full_data_access, normalize_teacher_name, teacher_turmas,
+                  user_public_dict)
 
 try:
     from db_store import DatabaseStore
@@ -473,7 +474,7 @@ def _scoped_students():
 
 
 def _scoped_lessons(all_students=None):
-    all_lessons = _load_lessons()
+    all_lessons = _sort_lessons(_load_lessons())
     user = _current_user()
     if not user:
         return all_lessons, []
@@ -481,6 +482,35 @@ def _scoped_lessons(all_students=None):
         all_students = _load_students()
     visible = filter_lessons_for_user(all_lessons, all_students, user)
     return all_lessons, visible
+
+
+def _allowed_turmas(all_students, user):
+    if has_full_data_access(user['role']):
+        return sorted({s.get('turma', '').strip() for s in all_students if s.get('turma', '').strip()})
+    return sorted(teacher_turmas(all_students, user.get('teacher_name', '')))
+
+
+def _teacher_may_use_turma(turma, all_students, user):
+    if has_full_data_access(user['role']):
+        return True
+    return turma.strip() in teacher_turmas(all_students, user.get('teacher_name', ''))
+
+
+def _lesson_from_form():
+    return {field: (request.form.get(field) or '').strip() for field in LESSON_FIELDS}
+
+
+def _sort_lessons(rows):
+    def sort_key(row):
+        turma = row.get('turma', '')
+        num = row.get('aula_num', '')
+        try:
+            num_val = int(float(num))
+        except (TypeError, ValueError):
+            num_val = 9999
+        return (turma, num_val, num)
+
+    return sorted(rows, key=sort_key)
 
 
 def _merge_scoped_students(all_students, visible_students):
@@ -730,6 +760,102 @@ def student_delete(idx):
                 all_rows.pop(global_idx)
         _save_students(all_rows)
     return redirect(url_for('students'))
+
+
+# ── Lessons (class details) ───────────────────────────────────────────────────────────
+
+@app.route('/lessons')
+@login_required
+def lessons():
+    all_students, _ = _scoped_students()
+    _, rows = _scoped_lessons(all_students)
+    turmas = sorted({r.get('turma', '').strip() for r in rows if r.get('turma', '').strip()})
+    return render_template(
+        'lessons.html',
+        lessons=rows,
+        turmas=turmas,
+        lesson_field_labels=LESSON_FIELD_LABELS,
+    )
+
+
+@app.route('/lessons/<int:idx>/edit', methods=['GET', 'POST'])
+@login_required
+def lesson_edit(idx):
+    all_students, _ = _scoped_students()
+    all_rows, visible = _scoped_lessons(all_students)
+    user = _current_user()
+    allowed_turmas = _allowed_turmas(all_students, user)
+
+    if idx < 0 or idx >= len(visible):
+        abort(404)
+
+    if request.method == 'POST':
+        updated = _lesson_from_form()
+        if not updated.get('turma') or not updated.get('aula_num'):
+            abort(400)
+        if not _teacher_may_use_turma(updated['turma'], all_students, user):
+            abort(403)
+        global_idx = find_lesson_global_index(all_rows, visible, idx)
+        if global_idx is None:
+            abort(404)
+        all_rows[global_idx] = updated
+        _save_lessons(_sort_lessons(all_rows))
+        return redirect(url_for('lessons'))
+
+    return render_template(
+        'lesson_edit.html',
+        lesson=visible[idx],
+        idx=idx,
+        is_new=False,
+        allowed_turmas=allowed_turmas,
+        lesson_field_labels=LESSON_FIELD_LABELS,
+    )
+
+
+@app.route('/lessons/new', methods=['GET', 'POST'])
+@login_required
+def lesson_new():
+    all_students, _ = _scoped_students()
+    all_rows, visible = _scoped_lessons(all_students)
+    user = _current_user()
+    allowed_turmas = _allowed_turmas(all_students, user)
+
+    if request.method == 'POST':
+        new_row = _lesson_from_form()
+        if not new_row.get('turma') or not new_row.get('aula_num'):
+            abort(400)
+        if not _teacher_may_use_turma(new_row['turma'], all_students, user):
+            abort(403)
+        all_rows.append(new_row)
+        _save_lessons(_sort_lessons(all_rows))
+        return redirect(url_for('lessons'))
+
+    defaults = dict(visible[-1]) if visible else {}
+    for field in LESSON_FIELDS:
+        defaults.setdefault(field, '')
+    if allowed_turmas:
+        defaults['turma'] = allowed_turmas[0]
+    return render_template(
+        'lesson_edit.html',
+        lesson=defaults,
+        idx=None,
+        is_new=True,
+        allowed_turmas=allowed_turmas,
+        lesson_field_labels=LESSON_FIELD_LABELS,
+    )
+
+
+@app.route('/lessons/<int:idx>/delete', methods=['POST'])
+@login_required
+def lesson_delete(idx):
+    all_students, _ = _scoped_students()
+    all_rows, visible = _scoped_lessons(all_students)
+    if 0 <= idx < len(visible):
+        global_idx = find_lesson_global_index(all_rows, visible, idx)
+        if global_idx is not None:
+            all_rows.pop(global_idx)
+            _save_lessons(all_rows)
+    return redirect(url_for('lessons'))
 
 
 # ── Upload ────────────────────────────────────────────────────────────────────────────

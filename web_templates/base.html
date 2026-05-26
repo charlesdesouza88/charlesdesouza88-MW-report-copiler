@@ -320,6 +320,9 @@ body.nav-open .nav-backdrop { display: block; }
   <a href="{{ url_for('students') }}" class="nav-link {% if 'student' in request.endpoint %}active{% endif %}">
     <span class="nav-icon">◉</span> Alunos
   </a>
+  <a href="{{ url_for('lessons') }}" class="nav-link {% if 'lesson' in request.endpoint %}active{% endif %}">
+    <span class="nav-icon">▤</span> Aulas
+  </a>
   {% if can_manage_teachers %}
   <a href="{{ url_for('upload') }}" class="nav-link {% if request.endpoint == 'upload' %}active{% endif %}">
     <span class="nav-icon">↑</span> Upload CSV
