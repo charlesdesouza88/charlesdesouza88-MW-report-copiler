@@ -64,12 +64,12 @@ def teacher_turmas(students, teacher_name):
 def filter_students_for_user(students, user):
     if has_full_data_access(user['role']):
         return list(students)
-    turmas = teacher_turmas(students, user.get('teacher_name', ''))
     key = normalize_teacher_name(user.get('teacher_name', '')).casefold()
+    if not key:
+        return []
     return [
         s for s in students
         if normalize_teacher_name(s.get('teacher', '')).casefold() == key
-        or s.get('turma', '').strip() in turmas
     ]
 
 
@@ -78,6 +78,11 @@ def filter_lessons_for_user(lessons, students, user):
         return list(lessons)
     turmas = teacher_turmas(students, user.get('teacher_name', ''))
     return [l for l in lessons if l.get('turma', '').strip() in turmas]
+
+
+def student_report_filename(turma, student_name):
+    safe_name = (student_name or '').replace(' ', '_')
+    return f'{turma}_{safe_name}_report.html'
 
 
 def report_belongs_to_turmas(filename, turmas):
@@ -93,11 +98,30 @@ def report_belongs_to_turmas(filename, turmas):
     return False
 
 
+def report_belongs_to_teacher(filename, students, teacher_name):
+    """Teachers see their students' reports and class diagnostics for their turmas only."""
+    name = Path(filename).name
+    if 'class_diagnostic' in name:
+        return report_belongs_to_turmas(name, teacher_turmas(students, teacher_name))
+
+    key = normalize_teacher_name(teacher_name).casefold()
+    if not key:
+        return False
+    for student in students:
+        if normalize_teacher_name(student.get('teacher', '')).casefold() != key:
+            continue
+        turma = student.get('turma', '').strip()
+        student_name = student.get('student_name', '').strip()
+        if turma and student_name and student_report_filename(turma, student_name) == name:
+            return True
+    return False
+
+
 def filter_reports_for_user(files, students, user):
     if has_full_data_access(user['role']):
         return list(files)
-    turmas = teacher_turmas(students, user.get('teacher_name', ''))
-    return [f for f in files if report_belongs_to_turmas(f.name, turmas)]
+    teacher_name = user.get('teacher_name', '')
+    return [f for f in files if report_belongs_to_teacher(f.name, students, teacher_name)]
 
 
 def find_student_global_index(all_students, filtered_students, filtered_idx):

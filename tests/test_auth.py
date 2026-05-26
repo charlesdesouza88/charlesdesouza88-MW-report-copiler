@@ -31,6 +31,17 @@ def test_filter_students_teacher_scope():
     assert visible[0]['turma'] == 'MASTER'
 
 
+def test_filter_students_excludes_other_teachers_in_same_turma():
+    students = [
+        {'teacher': 'Chuck', 'turma': 'MASTER', 'student_name': 'Jane'},
+        {'teacher': 'Barbara', 'turma': 'MASTER', 'student_name': 'Bob'},
+    ]
+    user = {'role': ROLE_TEACHER, 'teacher_name': 'Chuck'}
+    visible = filter_students_for_user(students, user)
+    assert len(visible) == 1
+    assert visible[0]['student_name'] == 'Jane'
+
+
 def test_filter_lessons_teacher_scope():
     user = {'role': ROLE_TEACHER, 'teacher_name': 'Chuck'}
     visible = filter_lessons_for_user(_lessons(), _students(), user)
@@ -46,6 +57,20 @@ def test_filter_reports_teacher_scope(tmp_path):
     master.write_text('x', encoding='utf-8')
     kids.write_text('y', encoding='utf-8')
     allowed = filter_reports_for_user([master, kids], students, user)
+    assert [p.name for p in allowed] == ['MASTER_Jane_report.html']
+
+
+def test_filter_reports_excludes_same_turma_other_teacher(tmp_path):
+    user = {'role': ROLE_TEACHER, 'teacher_name': 'Chuck'}
+    students = [
+        {'teacher': 'Chuck', 'turma': 'MASTER', 'student_name': 'Jane'},
+        {'teacher': 'Barbara', 'turma': 'MASTER', 'student_name': 'Bob'},
+    ]
+    jane = tmp_path / 'MASTER_Jane_report.html'
+    bob = tmp_path / 'MASTER_Bob_report.html'
+    jane.write_text('x', encoding='utf-8')
+    bob.write_text('y', encoding='utf-8')
+    allowed = filter_reports_for_user([jane, bob], students, user)
     assert [p.name for p in allowed] == ['MASTER_Jane_report.html']
 
 

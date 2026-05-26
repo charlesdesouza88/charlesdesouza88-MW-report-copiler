@@ -2,6 +2,7 @@ import io
 from pathlib import Path
 
 import app as web_app
+from auth import UserStore
 
 
 def _students_csv():
@@ -240,6 +241,35 @@ def test_upload_page_shows_csv_template_preview(monkeypatch, tmp_path):
     assert "Identificação" in html
     assert "Nome do aluno" in html
     assert "Lesson 3: Past tense review" in html
+
+
+def test_teacher_sees_only_own_students(monkeypatch, tmp_path):
+    data_dir = tmp_path / "data"
+    data_dir.mkdir()
+    csv_text = (
+        "teacher,turma,turma_display,nivel,horario,student_name,participacao,comportamento,speaking,listening,foco,writing,reading,gramatica,trabalho_equipe,organizacao,pontualidade,respeito_regras,faltas,missed_aulas,aula_extra,feedback_participacao,feedback_foco,feedback_trabalho_equipe,recomendacoes,observacao\n"
+        "Chuck,MASTER,Masters,Book,Tue,Jane Doe,4,3,4,5,4,3,4,2,3,3,3,3,1,2,,,,,,\n"
+        "Barbara,MASTER,Masters,Book,Tue,Bob Smith,4,3,4,5,4,3,4,2,3,3,3,3,1,2,,,,,,\n"
+    )
+    (data_dir / "students.csv").write_text(csv_text, encoding="utf-8")
+
+    store = UserStore(db_store=None, json_path=data_dir / "users.json")
+    store.initialize()
+    store.create_teacher("chuck@test.local", "pass123", "Chuck")
+
+    monkeypatch.setattr(web_app, "DATA_DIR", data_dir)
+    monkeypatch.setattr(web_app, "OUT_DIR", tmp_path / "output")
+    web_app.OUT_DIR.mkdir()
+    monkeypatch.setattr(web_app, "user_store", store)
+
+    client = web_app.app.test_client()
+    client.post("/login", data={"email": "chuck@test.local", "password": "pass123"})
+    response = client.get("/students")
+    html = response.get_data(as_text=True)
+
+    assert response.status_code == 200
+    assert "Jane Doe" in html
+    assert "Bob Smith" not in html
 
 
 def test_upload_template_lessons_download(monkeypatch, tmp_path):

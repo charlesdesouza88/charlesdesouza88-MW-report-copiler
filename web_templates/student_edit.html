@@ -19,7 +19,12 @@
       </div>
       <div class="form-group">
         <label>Professor</label>
+        {% if current_user and current_user.role == 'teacher' %}
+        <input type="text" value="{{ current_user.teacher_name or student.teacher or '' }}" readonly style="background:#f4f4f4;">
+        <input type="hidden" name="teacher" value="{{ current_user.teacher_name or student.teacher or '' }}">
+        {% else %}
         <input type="text" name="teacher" value="{{ student.teacher or '' }}">
+        {% endif %}
       </div>
       <div class="form-group">
         <label>Turma (ID)</label>
