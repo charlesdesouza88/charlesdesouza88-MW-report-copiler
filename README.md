@@ -263,7 +263,8 @@ On the **web service**, set:
 
 | Variable | Required | Notes |
 |---|---|---|
-| `ADMIN_PASSWORD` | Yes | Dashboard login password |
+| `SUPERADMIN_EMAIL` | Yes | Bootstrap superadmin login email |
+| `SUPERADMIN_PASSWORD` | Yes | Bootstrap superadmin login password |
 | `SECRET_KEY` | Yes | Long random string for Flask sessions |
 | `DATABASE_URL` | Recommended | From a Railway PostgreSQL service |
 | `DATA_DIR` | Optional | Path on a mounted volume for CSV files |
@@ -301,7 +302,7 @@ CLI alternative: `npx -y @railway/cli login` then `railway link` in this directo
 
 ### 5. Post-deploy checks
 
-1. Open the Railway public URL → `/login` with `ADMIN_PASSWORD`.
+1. Open the Railway public URL → `/login` with `SUPERADMIN_EMAIL` and `SUPERADMIN_PASSWORD`.
 2. Upload `students.csv` and `lessons.csv` (or use DB mode after Postgres is linked).
 3. **Generate** reports and confirm preview/download work.
 
