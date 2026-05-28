@@ -42,7 +42,7 @@
     <div class="student-card-actions">
       <a href="{{ url_for('student_edit', idx=loop.index0) }}" class="btn btn-ghost btn-sm">Editar</a>
       <form method="post" action="{{ url_for('student_delete', idx=loop.index0) }}"
-            onsubmit="return confirm('Excluir {{ s.student_name }}?')">
+            onsubmit="return confirm({{ ('Excluir ' ~ s.student_name ~ '?')|tojson }})">
         <button type="submit" class="btn btn-danger btn-sm">Excluir</button>
       </form>
     </div>
@@ -92,7 +92,7 @@
           <div class="flex gap-8">
             <a href="{{ url_for('student_edit', idx=loop.index0) }}" class="btn btn-ghost btn-xs">Editar</a>
             <form method="post" action="{{ url_for('student_delete', idx=loop.index0) }}"
-                  onsubmit="return confirm('Excluir {{ s.student_name }}?')">
+                  onsubmit="return confirm({{ ('Excluir ' ~ s.student_name ~ '?')|tojson }})">
               <button type="submit" class="btn btn-danger btn-xs">✕</button>
             </form>
           </div>

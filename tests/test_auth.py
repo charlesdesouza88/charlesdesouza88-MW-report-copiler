@@ -76,6 +76,22 @@ def test_filter_reports_excludes_same_turma_other_teacher(tmp_path):
     assert [p.name for p in allowed] == ['MASTER_Jane_report.html']
 
 
+def test_filter_reports_class_diagnostic_requires_exact_turma(tmp_path):
+    user = {'role': ROLE_TEACHER, 'teacher_name': 'Chuck'}
+    students = [
+        {'teacher': 'Chuck', 'turma': 'MAST', 'student_name': 'Jane'},
+        {'teacher': 'Ana', 'turma': 'MASTER', 'student_name': 'Bob'},
+    ]
+    own = tmp_path / 'MAST_class_diagnostic.html'
+    other = tmp_path / 'MASTER_class_diagnostic.html'
+    own.write_text('x', encoding='utf-8')
+    other.write_text('y', encoding='utf-8')
+
+    allowed = filter_reports_for_user([own, other], students, user)
+
+    assert [p.name for p in allowed] == ['MAST_class_diagnostic.html']
+
+
 def test_user_store_create_teacher(tmp_path):
     store = UserStore(json_path=tmp_path / 'users.json')
     store.initialize()

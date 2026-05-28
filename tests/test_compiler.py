@@ -1,5 +1,7 @@
 from compiler import (
     build_student_ctx,
+    create_report_environment,
+    generate_individual_reports,
     group_by_turma,
     int_score,
     needs_extra,
@@ -116,12 +118,10 @@ def test_group_by_turma_groups_students():
 def test_individual_report_renders_labeled_overall_scores():
     from pathlib import Path
 
-    from jinja2 import Environment, FileSystemLoader
-
     from compiler import build_student_ctx
 
     base = Path(__file__).resolve().parent.parent
-    env = Environment(loader=FileSystemLoader(str(base / "templates")), autoescape=False)
+    env = create_report_environment(base / "templates")
     html = env.get_template("individual_report.html").render(
         **build_student_ctx(_student(), _lessons())
     )
@@ -131,3 +131,37 @@ def test_individual_report_renders_labeled_overall_scores():
     assert "bubble-abs" not in html
     assert "Nota" in html
     assert "Critérios" in html
+
+
+def test_report_generation_escapes_text_and_sanitizes_filename(tmp_path):
+    from pathlib import Path
+
+    base = Path(__file__).resolve().parent.parent
+    env = create_report_environment(base / "templates")
+    student = _student(
+        turma="../MASTER",
+        student_name="../Jane <script>alert(1)</script>",
+        feedback_participacao="<script>alert(1)</script>",
+        recomendacoes="<img src=x onerror=alert(1)>",
+    )
+    lessons = [
+        {
+            "turma": "../MASTER",
+            "aula_num": "1",
+            "date": "01/01",
+            "licao_conteudo": "L1",
+            "atividade_extra": "",
+            "habilidades": "",
+        },
+    ]
+
+    generate_individual_reports([student], lessons, env, tmp_path)
+
+    generated = list(tmp_path.glob("*_report.html"))
+    assert len(generated) == 1
+    assert generated[0].parent == tmp_path
+    assert ".." not in generated[0].name
+    html = generated[0].read_text(encoding="utf-8")
+    assert "<script>alert(1)</script>" not in html
+    assert "&lt;script&gt;alert(1)&lt;/script&gt;" in html
+    assert "<img src=x" not in html

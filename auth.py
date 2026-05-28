@@ -6,6 +6,8 @@ from pathlib import Path
 
 from werkzeug.security import check_password_hash, generate_password_hash
 
+from report_names import class_diagnostic_filename, student_report_filename
+
 logger = logging.getLogger(__name__)
 
 ROLE_SUPERADMIN = 'superadmin'
@@ -77,7 +79,7 @@ def filter_lessons_for_user(lessons, students, user):
     if has_full_data_access(user['role']):
         return list(lessons)
     turmas = teacher_turmas(students, user.get('teacher_name', ''))
-    return [l for l in lessons if l.get('turma', '').strip() in turmas]
+    return [lesson for lesson in lessons if lesson.get('turma', '').strip() in turmas]
 
 
 def filter_extra_sessions_for_user(sessions, user):
@@ -110,11 +112,6 @@ def find_extra_session_global_index(all_sessions, filtered_sessions, filtered_id
     return None
 
 
-def student_report_filename(turma, student_name):
-    safe_name = (student_name or '').replace(' ', '_')
-    return f'{turma}_{safe_name}_report.html'
-
-
 def report_belongs_to_turmas(filename, turmas):
     if not turmas:
         return False
@@ -122,8 +119,7 @@ def report_belongs_to_turmas(filename, turmas):
     for turma in turmas:
         if not turma:
             continue
-        prefix = f'{turma}_'
-        if name.startswith(prefix):
+        if name == class_diagnostic_filename(turma):
             return True
     return False
 

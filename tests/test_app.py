@@ -65,6 +65,24 @@ def test_health_db_csv_mode():
     assert payload["mode"] == "csv"
 
 
+def test_health_auth_omits_account_emails(monkeypatch, tmp_path):
+    monkeypatch.setattr(web_app, "DATA_DIR", tmp_path / "data")
+    monkeypatch.setattr(web_app, "OUT_DIR", tmp_path / "output")
+    web_app.DATA_DIR.mkdir()
+    web_app.OUT_DIR.mkdir()
+    _init_user_store(monkeypatch, web_app.DATA_DIR)
+
+    client = web_app.app.test_client()
+    response = client.get("/health/auth")
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["user_count"] == 1
+    assert "accounts" not in payload
+    assert "configured_email" not in payload
+    assert "admin@test.local" not in response.get_data(as_text=True)
+
+
 def test_login_success_sets_session(monkeypatch, tmp_path):
     monkeypatch.setattr(web_app, "DATA_DIR", tmp_path / "data")
     monkeypatch.setattr(web_app, "OUT_DIR", tmp_path / "output")
@@ -116,6 +134,50 @@ def test_generate_reports_writes_html_files(monkeypatch, tmp_path):
     generated = sorted(p.name for p in out_dir.glob("*.html"))
     assert "MASTER_Jane_Doe_report.html" in generated
     assert "MASTER_class_diagnostic.html" in generated
+
+
+def test_generate_missing_csv_shows_upload_error(monkeypatch, tmp_path):
+    data_dir = tmp_path / "data"
+    out_dir = tmp_path / "output"
+    data_dir.mkdir()
+    out_dir.mkdir()
+
+    _init_user_store(monkeypatch, data_dir)
+    monkeypatch.setattr(web_app, "DATA_DIR", data_dir)
+    monkeypatch.setattr(web_app, "TMPL_DIR", Path(web_app.__file__).parent / "templates")
+    monkeypatch.setattr(web_app, "OUT_DIR", out_dir)
+
+    client = web_app.app.test_client()
+    _login(client)
+    response = client.post("/generate")
+
+    assert response.status_code == 200
+    html = response.get_data(as_text=True)
+    assert "students.csv não encontrado" in html
+    assert "csv-preview-table" in html
+
+
+def test_generate_invalid_csv_reuses_full_upload_context(monkeypatch, tmp_path):
+    data_dir = tmp_path / "data"
+    out_dir = tmp_path / "output"
+    data_dir.mkdir()
+    out_dir.mkdir()
+    (data_dir / "students.csv").write_text("teacher,turma\nChuck,MASTER\n", encoding="utf-8")
+    (data_dir / "lessons.csv").write_text(_lessons_csv(), encoding="utf-8")
+
+    _init_user_store(monkeypatch, data_dir)
+    monkeypatch.setattr(web_app, "DATA_DIR", data_dir)
+    monkeypatch.setattr(web_app, "TMPL_DIR", Path(web_app.__file__).parent / "templates")
+    monkeypatch.setattr(web_app, "OUT_DIR", out_dir)
+
+    client = web_app.app.test_client()
+    _login(client)
+    response = client.post("/generate")
+
+    assert response.status_code == 200
+    html = response.get_data(as_text=True)
+    assert "CSV de Alunos invalido" in html
+    assert "csv-preview-table" in html
 
 
 def test_reports_preview_path_is_sanitized(monkeypatch, tmp_path):
@@ -339,6 +401,30 @@ def test_teacher_sees_only_own_students(monkeypatch, tmp_path):
     assert response.status_code == 200
     assert "Jane Doe" in html
     assert "Bob Smith" not in html
+
+
+def test_teacher_cannot_create_student_in_other_turma(monkeypatch, tmp_path):
+    data_dir = tmp_path / "data"
+    data_dir.mkdir()
+    (data_dir / "students.csv").write_text(_students_csv(), encoding="utf-8")
+
+    monkeypatch.setattr(web_app, "DATA_DIR", data_dir)
+    monkeypatch.setattr(web_app, "OUT_DIR", tmp_path / "output")
+    web_app.OUT_DIR.mkdir()
+    _init_teacher_store(monkeypatch, data_dir, teacher_name="Chuck")
+
+    client = web_app.app.test_client()
+    _login(client, email="teacher@test.local", password="teachpass")
+    response = client.post(
+        "/students/new",
+        data={
+            "teacher": "Chuck",
+            "turma": "OTHER",
+            "student_name": "Mallory",
+        },
+    )
+
+    assert response.status_code == 403
 
 
 def test_upload_template_lessons_download(monkeypatch, tmp_path):

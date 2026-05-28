@@ -42,7 +42,7 @@
     <div class="student-card-actions" style="margin-top:14px;">
       <a href="{{ url_for('lesson_edit', idx=loop.index0) }}" class="btn btn-ghost btn-sm">Editar</a>
       <form method="post" action="{{ url_for('lesson_delete', idx=loop.index0) }}"
-            onsubmit="return confirm('Excluir aula {{ lesson.aula_num }} da turma {{ lesson.turma }}?')">
+            onsubmit="return confirm({{ ('Excluir aula ' ~ lesson.aula_num ~ ' da turma ' ~ lesson.turma ~ '?')|tojson }})">
         <button type="submit" class="btn btn-danger btn-sm">Excluir</button>
       </form>
     </div>

@@ -13,10 +13,9 @@ from pathlib import Path
 
 from flask import (Flask, abort, redirect, render_template, request,
                    send_file, session, url_for)
-from jinja2 import Environment, FileSystemLoader
 
-from compiler import (generate_class_diagnostics, generate_individual_reports,
-                      group_by_turma, load_csv)
+from compiler import (create_report_environment, generate_class_diagnostics,
+                      generate_individual_reports, group_by_turma, load_csv)
 
 from auth import (ROLE_ADMIN, ROLE_LABELS, ROLE_SUPERADMIN, ROLE_TEACHER,
                   UserStore, can_manage_teachers, filter_extra_sessions_for_user,
@@ -163,7 +162,21 @@ OUT_DIR = _ensure_writable_dir(
     os.environ.get('OUT_DIR', default_out_dir), '/tmp/mw/output')
 
 app = Flask(__name__, template_folder='web_templates')
-app.secret_key = os.environ.get('SECRET_KEY', 'mw-dev-change-in-prod')
+SECRET_KEY = os.environ.get('SECRET_KEY')
+PRODUCTION_ENV = (
+    os.environ.get('FLASK_ENV') == 'production'
+    or os.environ.get('RAILWAY_ENVIRONMENT')
+    or os.environ.get('RAILWAY_SERVICE_ID')
+)
+if PRODUCTION_ENV and not SECRET_KEY:
+    raise RuntimeError('SECRET_KEY must be set in production.')
+app.secret_key = SECRET_KEY or 'mw-dev-change-in-prod'
+app.config.update(
+    MAX_CONTENT_LENGTH=int(os.environ.get('MAX_UPLOAD_MB', '5')) * 1024 * 1024,
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE='Lax',
+    SESSION_COOKIE_SECURE=bool(PRODUCTION_ENV),
+)
 
 app.jinja_env.globals.update(
     storage_date_to_iso=storage_date_to_iso,
@@ -532,12 +545,20 @@ def _current_user():
     user_id = session.get('user_id')
     if not user_id:
         return None
-    return {
-        'id': user_id,
-        'email': session.get('email', ''),
-        'role': session.get('role', ''),
-        'teacher_name': session.get('teacher_name', ''),
-    }
+    try:
+        user = user_store.get_by_id(user_id)
+    except Exception as exc:
+        logger.warning('Could not refresh session user %s: %s', user_id, exc)
+        session.clear()
+        return None
+    if not user or not user.get('active', True):
+        session.clear()
+        return None
+    public = user_public_dict(user)
+    session['email'] = public['email']
+    session['role'] = public['role']
+    session['teacher_name'] = public.get('teacher_name') or ''
+    return public
 
 
 def _login_session(user):
@@ -601,6 +622,15 @@ def _teacher_may_use_turma(turma, all_students, user):
     if has_full_data_access(user['role']):
         return True
     return turma.strip() in teacher_turmas(all_students, user.get('teacher_name', ''))
+
+
+def _teacher_may_use_student_turma(turma, all_students, user):
+    if has_full_data_access(user['role']):
+        return True
+    existing_turmas = teacher_turmas(all_students, user.get('teacher_name', ''))
+    if not existing_turmas:
+        return True
+    return turma.strip() in existing_turmas
 
 
 def _lesson_from_form():
@@ -746,6 +776,37 @@ def _pull_upload_notices():
     return messages, errors
 
 
+def _upload_page_context(user, messages=None, errors=None):
+    messages = list(messages or [])
+    errors = list(errors or [])
+    all_students = _load_students()
+    all_lessons = _load_lessons()
+    if has_full_data_access(user['role']):
+        students_exists = bool(all_students) if db_store else (DATA_DIR / 'students.csv').exists()
+        lessons_exists = bool(all_lessons) if db_store else (DATA_DIR / 'lessons.csv').exists()
+    else:
+        students_exists = bool(filter_students_for_user(all_students, user))
+        lessons_exists = bool(filter_lessons_for_user(all_lessons, all_students, user))
+    return {
+        'messages': messages,
+        'errors': errors,
+        'can_delete_all_csv': has_full_data_access(user['role']),
+        'is_teacher_upload': not has_full_data_access(user['role']),
+        'students_exists': students_exists,
+        'lessons_exists': lessons_exists,
+        'student_template_rows': _load_template_rows('students'),
+        'lesson_template_rows': _load_template_rows('lessons'),
+        'student_field_labels': STUDENT_FIELD_LABELS,
+        'lesson_field_labels': LESSON_FIELD_LABELS,
+        'student_template_sections': STUDENT_TEMPLATE_SECTIONS,
+        'student_fields': STUDENT_FIELDS,
+        'lesson_fields': LESSON_FIELDS,
+        'student_preview_columns': _student_preview_columns(),
+        'lesson_preview_columns': _lesson_preview_columns(),
+        'score_fields': sorted(SCORE_FIELDS),
+    }
+
+
 def _delete_csv_dataset(name, user):
     """Remove uploaded CSV data. Admins clear all; teachers only their rows."""
     if name not in ('students', 'lessons'):
@@ -810,12 +871,17 @@ def health_db():
 
 @app.route('/health/auth')
 def health_auth():
-    """Auth diagnostics (JSON). No secrets — for Railway / ops."""
+    """Auth diagnostics (JSON). Public payload intentionally excludes PII."""
     status = user_store.auth_status(SUPERADMIN_EMAIL)
-    status['configured_email'] = SUPERADMIN_EMAIL or ''
-    status['password_configured'] = bool(SUPERADMIN_PASSWORD)
-    status['storage'] = 'postgresql' if db_store else 'json'
-    return json.dumps(status, ensure_ascii=False), 200, {'Content-Type': 'application/json'}
+    public_status = {
+        'user_count': status['user_count'],
+        'superadmin_count': status['superadmin_count'],
+        'bootstrap_email_configured': status['bootstrap_email_configured'],
+        'bootstrap_email_registered': status['bootstrap_email_registered'],
+        'password_configured': bool(SUPERADMIN_PASSWORD),
+        'storage': 'postgresql' if db_store else 'json',
+    }
+    return json.dumps(public_status, ensure_ascii=False), 200, {'Content-Type': 'application/json'}
 
 
 @app.route('/login', methods=['GET', 'POST'])
@@ -899,7 +965,7 @@ def dashboard():
 @login_required
 def students():
     _, rows = _scoped_students()
-    turmas = sorted(set(r['turma'] for r in rows))
+    turmas = sorted({r.get('turma', '').strip() for r in rows if r.get('turma', '').strip()})
     return render_template('students.html', students=rows, turmas=turmas)
 
 
@@ -915,6 +981,10 @@ def student_edit(idx):
             visible[idx][field] = request.form.get(field, '')
         if user['role'] == ROLE_TEACHER:
             visible[idx]['teacher'] = user.get('teacher_name') or visible[idx].get('teacher', '')
+        if not visible[idx].get('turma') or not visible[idx].get('student_name'):
+            abort(400)
+        if not _teacher_may_use_student_turma(visible[idx]['turma'], all_rows, user):
+            abort(403)
         if has_full_data_access(user['role']):
             _save_students(visible)
         else:
@@ -937,6 +1007,10 @@ def student_new():
         new_row = {f: request.form.get(f, '') for f in STUDENT_FIELDS}
         if user['role'] == ROLE_TEACHER:
             new_row['teacher'] = user.get('teacher_name') or new_row.get('teacher', '')
+        if not new_row.get('turma') or not new_row.get('student_name'):
+            abort(400)
+        if not _teacher_may_use_student_turma(new_row['turma'], all_rows, user):
+            abort(403)
         all_rows.append(new_row)
         _save_students(all_rows)
         return redirect(url_for('students'))
@@ -1261,29 +1335,7 @@ def upload():
                     messages.append(f'{label} carregado: {f.filename}')
                 except OSError as exc:
                     errors.append(f'Erro ao salvar {label}: {exc}')
-    all_students = _load_students()
-    all_lessons = _load_lessons()
-    if has_full_data_access(user['role']):
-        students_exists = bool(all_students) if db_store else (DATA_DIR / 'students.csv').exists()
-        lessons_exists = bool(all_lessons) if db_store else (DATA_DIR / 'lessons.csv').exists()
-    else:
-        students_exists = bool(filter_students_for_user(all_students, user))
-        lessons_exists = bool(filter_lessons_for_user(all_lessons, all_students, user))
-    return render_template('upload.html', messages=messages, errors=errors,
-        can_delete_all_csv=has_full_data_access(user['role']),
-        is_teacher_upload=not has_full_data_access(user['role']),
-        students_exists=students_exists, lessons_exists=lessons_exists,
-        student_template_rows=_load_template_rows('students'),
-        lesson_template_rows=_load_template_rows('lessons'),
-        student_field_labels=STUDENT_FIELD_LABELS,
-        lesson_field_labels=LESSON_FIELD_LABELS,
-        student_template_sections=STUDENT_TEMPLATE_SECTIONS,
-        student_fields=STUDENT_FIELDS,
-        lesson_fields=LESSON_FIELDS,
-        student_preview_columns=_student_preview_columns(),
-        lesson_preview_columns=_lesson_preview_columns(),
-        score_fields=sorted(SCORE_FIELDS),
-    )
+    return render_template('upload.html', **_upload_page_context(user, messages, errors))
 
 
 @app.route('/upload/delete/<name>', methods=['POST'])
@@ -1400,7 +1452,7 @@ def generate():
     if db_store:
         if not students or not lessons:
             return redirect(url_for('upload' if has_full_data_access(user['role']) else 'dashboard'))
-        env = Environment(loader=FileSystemLoader(str(TMPL_DIR)), autoescape=False)
+        env = create_report_environment(TMPL_DIR)
         generate_individual_reports(students, lessons, env, OUT_DIR)
         generate_class_diagnostics(students, lessons, env, OUT_DIR)
         return redirect(url_for('reports'))
@@ -1408,6 +1460,16 @@ def generate():
     if has_full_data_access(user['role']):
         students_file = DATA_DIR / 'students.csv'
         lessons_file = DATA_DIR / 'lessons.csv'
+        missing = []
+        if not students_file.exists():
+            missing.append('students.csv não encontrado.')
+        if not lessons_file.exists():
+            missing.append('lessons.csv não encontrado.')
+        if missing:
+            return render_template(
+                'upload.html',
+                **_upload_page_context(user, errors=missing),
+            )
         students_text = students_file.read_text(encoding='utf-8')
         lessons_text = lessons_file.read_text(encoding='utf-8')
         students_errors = _validate_csv('students', students_text)
@@ -1420,13 +1482,10 @@ def generate():
                 errors.append(f'CSV de Aulas invalido: {lessons_errors[0]}')
             return render_template(
                 'upload.html',
-                messages=[],
-                errors=errors,
-                students_exists=students_file.exists(),
-                lessons_exists=lessons_file.exists(),
+                **_upload_page_context(user, errors=errors),
             )
 
-    env = Environment(loader=FileSystemLoader(str(TMPL_DIR)), autoescape=False)
+    env = create_report_environment(TMPL_DIR)
     generate_individual_reports(students, lessons, env, OUT_DIR)
     generate_class_diagnostics(students, lessons, env, OUT_DIR)
     return redirect(url_for('reports'))

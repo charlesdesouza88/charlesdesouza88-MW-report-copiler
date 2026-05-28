@@ -3,10 +3,13 @@
 
 import csv
 import math
-import os
 import sys
 from pathlib import Path
-from jinja2 import Environment, FileSystemLoader
+
+from jinja2 import Environment, FileSystemLoader, select_autoescape
+
+from report_names import (class_diagnostic_filename, safe_child_path,
+                          student_report_filename)
 
 
 # ── SVG helpers ──────────────────────────────────────────────────────────────
@@ -134,10 +137,14 @@ def presence_pct(faltas, total_lessons):
 
 
 def pres_to_score(pct):
-    if pct >= 95: return 5
-    if pct >= 85: return 4
-    if pct >= 75: return 3
-    if pct >= 65: return 2
+    if pct >= 95:
+        return 5
+    if pct >= 85:
+        return 4
+    if pct >= 75:
+        return 3
+    if pct >= 65:
+        return 2
     return 1
 
 
@@ -147,11 +154,19 @@ def missed_lessons(student, all_lessons):
         return []
     nums = {n.strip() for n in raw.split(",") if n.strip()}
     turma = student["turma"]
-    return [l for l in all_lessons if l["turma"] == turma and l["aula_num"].strip() in nums]
+    return [
+        lesson
+        for lesson in all_lessons
+        if lesson["turma"] == turma and lesson["aula_num"].strip() in nums
+    ]
 
 
 def lessons_for(turma, all_lessons):
-    return [l for l in all_lessons if l["turma"] == turma and l["aula_num"].strip()]
+    return [
+        lesson
+        for lesson in all_lessons
+        if lesson["turma"] == turma and lesson["aula_num"].strip()
+    ]
 
 
 def needs_extra(student):
@@ -255,14 +270,20 @@ def build_class_ctx(turma, students, all_lessons):
 
 # ── Output generators ─────────────────────────────────────────────────────────
 
+def create_report_environment(template_dir):
+    return Environment(
+        loader=FileSystemLoader(str(template_dir)),
+        autoescape=select_autoescape(("html", "xml")),
+    )
+
+
 def generate_individual_reports(students, lessons, env, out_dir):
     tpl = env.get_template("individual_report.html")
     for s in students:
         ctx = build_student_ctx(s, lessons)
         html = tpl.render(**ctx)
-        safe_name = s["student_name"].replace(" ", "_")
-        fname = f"{s['turma']}_{safe_name}_report.html"
-        (out_dir / fname).write_text(html, encoding="utf-8")
+        fname = student_report_filename(s["turma"], s["student_name"])
+        safe_child_path(out_dir, fname).write_text(html, encoding="utf-8")
         print(f"  ✓ {fname}")
 
 
@@ -271,8 +292,8 @@ def generate_class_diagnostics(students, lessons, env, out_dir):
     for turma, group in group_by_turma(students).items():
         ctx = build_class_ctx(turma, group, lessons)
         html = tpl.render(**ctx)
-        fname = f"{turma}_class_diagnostic.html"
-        (out_dir / fname).write_text(html, encoding="utf-8")
+        fname = class_diagnostic_filename(turma)
+        safe_child_path(out_dir, fname).write_text(html, encoding="utf-8")
         print(f"  ✓ {fname}")
 
 
@@ -298,7 +319,7 @@ def main():
     students = load_csv(students_file)
     lessons = load_csv(lessons_file)
 
-    env = Environment(loader=FileSystemLoader(str(tmpl_dir)), autoescape=False)
+    env = create_report_environment(tmpl_dir)
 
     print("\nGenerating individual student reports...")
     generate_individual_reports(students, lessons, env, out_dir)
