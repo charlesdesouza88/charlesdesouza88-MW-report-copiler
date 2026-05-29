@@ -7,12 +7,14 @@ import io
 import json
 import logging
 import os
+import tempfile
 import time
 import zipfile
 from pathlib import Path
 
-from flask import (Flask, abort, redirect, render_template, request,
+from flask import (Flask, Response, abort, redirect, render_template, request,
                    send_file, session, url_for)
+from werkzeug.exceptions import RequestEntityTooLarge
 
 from compiler import (create_report_environment, generate_class_diagnostics,
                       generate_individual_reports, group_by_turma, load_csv)
@@ -83,6 +85,16 @@ _load_local_env()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+
+def _is_production_env():
+    return (
+        os.environ.get('FLASK_ENV') == 'production'
+        or os.environ.get('RAILWAY_ENVIRONMENT')
+        or os.environ.get('RAILWAY_SERVICE_ID')
+    )
+
+
+PRODUCTION_ENV = _is_production_env()
 DATABASE_URL = os.environ.get('DATABASE_URL', '').strip()
 if not DATABASE_URL:
     DATABASE_URL = os.environ.get('DATABASE_PRIVATE_URL', '').strip()
@@ -105,11 +117,15 @@ if DB_ENABLED:
                 time.sleep(2)
     if last_exc is not None:
         logger.exception('Database startup failed; falling back to CSV mode')
+        if PRODUCTION_ENV:
+            raise RuntimeError('Database startup failed in production.') from last_exc
         db_store = None
         DB_ENABLED = False
         DB_STARTUP_ERROR = str(last_exc)
 elif DATABASE_URL and DB_IMPORT_ERROR is not None:
     logger.error('DATABASE_URL is set but database dependencies failed to import: %s', DB_IMPORT_ERROR)
+    if PRODUCTION_ENV:
+        raise RuntimeError('Database dependencies failed to import in production.') from DB_IMPORT_ERROR
     DB_STARTUP_ERROR = f'Database dependencies failed to import: {DB_IMPORT_ERROR}'
 
 
@@ -154,20 +170,16 @@ def _database_status():
 
 default_data_dir = str(BASE / 'data')
 default_out_dir = str(BASE / 'output')
+tmp_root = Path(tempfile.gettempdir()) / 'mw'
 
 TMPL_DIR = BASE / 'templates'
 DATA_DIR = _ensure_writable_dir(
-    os.environ.get('DATA_DIR', default_data_dir), '/tmp/mw/data')
+    os.environ.get('DATA_DIR', default_data_dir), tmp_root / 'data')
 OUT_DIR = _ensure_writable_dir(
-    os.environ.get('OUT_DIR', default_out_dir), '/tmp/mw/output')
+    os.environ.get('OUT_DIR', default_out_dir), tmp_root / 'output')
 
 app = Flask(__name__, template_folder='web_templates')
 SECRET_KEY = os.environ.get('SECRET_KEY')
-PRODUCTION_ENV = (
-    os.environ.get('FLASK_ENV') == 'production'
-    or os.environ.get('RAILWAY_ENVIRONMENT')
-    or os.environ.get('RAILWAY_SERVICE_ID')
-)
 if PRODUCTION_ENV and not SECRET_KEY:
     raise RuntimeError('SECRET_KEY must be set in production.')
 app.secret_key = SECRET_KEY or 'mw-dev-change-in-prod'
@@ -177,6 +189,18 @@ app.config.update(
     SESSION_COOKIE_SAMESITE='Lax',
     SESSION_COOKIE_SECURE=bool(PRODUCTION_ENV),
 )
+
+
+@app.after_request
+def add_security_headers(response):
+    response.headers.setdefault('X-Content-Type-Options', 'nosniff')
+    response.headers.setdefault('X-Frame-Options', 'DENY')
+    response.headers.setdefault('Referrer-Policy', 'same-origin')
+    response.headers.setdefault(
+        'Permissions-Policy',
+        'camera=(), microphone=(), geolocation=()',
+    )
+    return response
 
 app.jinja_env.globals.update(
     storage_date_to_iso=storage_date_to_iso,
@@ -776,6 +800,15 @@ def _pull_upload_notices():
     return messages, errors
 
 
+@app.errorhandler(RequestEntityTooLarge)
+def handle_request_entity_too_large(_exc):
+    limit_mb = app.config['MAX_CONTENT_LENGTH'] // (1024 * 1024)
+    if request.path.startswith('/upload'):
+        _queue_upload_notice(error=f'Arquivo muito grande. Limite de upload: {limit_mb} MB.')
+        return redirect(url_for('upload')), 303
+    return 'Payload too large', 413
+
+
 def _upload_page_context(user, messages=None, errors=None):
     messages = list(messages or [])
     errors = list(errors or [])
@@ -942,11 +975,7 @@ def dashboard():
     reports = filter_reports_for_user(sorted(OUT_DIR.glob('*.html')), all_students, _current_user())
     turmas = group_by_turma(students) if students else {}
     individual = [f for f in reports if 'class_diagnostic' not in f.name]
-    if db_store:
-        data_ready = bool(students) and bool(lessons)
-    else:
-        lessons_path = DATA_DIR / 'lessons.csv'
-        data_ready = (DATA_DIR / 'students.csv').exists() and lessons_path.exists()
+    data_ready = bool(students) and bool(lessons)
     db_status = _database_status()
     return render_template('dashboard.html',
         student_count=len(students),
@@ -1574,7 +1603,7 @@ def preview(filename):
     path = _allowed_report_path(filename)
     if not path:
         abort(404)
-    return path.read_text(encoding='utf-8')
+    return Response(path.read_text(encoding='utf-8'), mimetype='text/html')
 
 
 @app.route('/reports/download/<path:filename>')
@@ -1600,7 +1629,7 @@ def download_all():
                      as_attachment=True, download_name='mister_wiz_reports.zip')
 
 
-def _pick_port(preferred):
+def _pick_port(preferred, host):
     """Use preferred port, or the next free one (macOS AirPlay often blocks 5000)."""
     import socket
 
@@ -1608,7 +1637,7 @@ def _pick_port(preferred):
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
             sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             try:
-                sock.bind(('0.0.0.0', candidate))
+                sock.bind((host, candidate))
             except OSError:
                 continue
             return candidate
@@ -1618,9 +1647,10 @@ def _pick_port(preferred):
 if __name__ == '__main__':
     debug = os.environ.get('FLASK_DEBUG', '').lower() in ('1', 'true', 'yes')
     preferred = int(os.environ.get('PORT', '5000'))
-    port = _pick_port(preferred)
+    host = os.environ.get('HOST', '127.0.0.1')
+    port = _pick_port(preferred, host)
     if port != preferred:
-        logger.warning('Port %s is in use; starting on http://127.0.0.1:%s', preferred, port)
+        logger.warning('Port %s is in use; starting on http://%s:%s', preferred, host, port)
     else:
-        logger.info('Starting on http://127.0.0.1:%s', port)
-    app.run(debug=debug, host='0.0.0.0', port=port)
+        logger.info('Starting on http://%s:%s', host, port)
+    app.run(debug=debug, host=host, port=port)

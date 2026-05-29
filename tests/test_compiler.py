@@ -4,6 +4,7 @@ from compiler import (
     generate_individual_reports,
     group_by_turma,
     int_score,
+    load_csv,
     needs_extra,
     pie_path,
     pres_to_score,
@@ -113,6 +114,15 @@ def test_group_by_turma_groups_students():
     ])
     assert sorted(groups.keys()) == ["MASTER", "SPARK"]
     assert len(groups["MASTER"]) == 2
+
+
+def test_load_csv_accepts_utf8_bom(tmp_path):
+    path = tmp_path / "students.csv"
+    path.write_text("\ufeffteacher,turma\nChuck,MASTER\n", encoding="utf-8")
+
+    rows = load_csv(path)
+
+    assert rows == [{"teacher": "Chuck", "turma": "MASTER"}]
 
 
 def test_individual_report_renders_labeled_overall_scores():

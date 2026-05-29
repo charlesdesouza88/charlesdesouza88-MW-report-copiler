@@ -56,6 +56,15 @@ def test_health_returns_ok():
     assert response.get_data(as_text=True) == "ok"
 
 
+def test_responses_include_baseline_security_headers():
+    client = web_app.app.test_client()
+    response = client.get("/health")
+
+    assert response.headers["X-Content-Type-Options"] == "nosniff"
+    assert response.headers["X-Frame-Options"] == "DENY"
+    assert response.headers["Referrer-Policy"] == "same-origin"
+
+
 def test_health_db_csv_mode():
     client = web_app.app.test_client()
     response = client.get("/health/db")
@@ -197,7 +206,29 @@ def test_reports_preview_path_is_sanitized(monkeypatch, tmp_path):
     blocked = client.get("/reports/preview/../secret.txt")
 
     assert ok.status_code == 200
+    assert ok.mimetype == "text/html"
     assert blocked.status_code == 404
+
+
+def test_oversized_upload_shows_user_facing_error(monkeypatch, tmp_path):
+    monkeypatch.setattr(web_app, "DATA_DIR", tmp_path / "data")
+    monkeypatch.setattr(web_app, "OUT_DIR", tmp_path / "output")
+    web_app.DATA_DIR.mkdir()
+    web_app.OUT_DIR.mkdir()
+    _init_user_store(monkeypatch, web_app.DATA_DIR)
+
+    client = web_app.app.test_client()
+    _login(client)
+    monkeypatch.setitem(web_app.app.config, "MAX_CONTENT_LENGTH", 10)
+    response = client.post(
+        "/upload",
+        data={"students": (io.BytesIO(b"x" * 100), "students.csv")},
+        content_type="multipart/form-data",
+        follow_redirects=True,
+    )
+
+    assert response.status_code == 200
+    assert "Arquivo muito grande" in response.get_data(as_text=True)
 
 
 def test_upload_invalid_students_csv_shows_error_and_does_not_crash(monkeypatch, tmp_path):
@@ -273,6 +304,30 @@ def test_authenticated_shell_has_drawer_markup(monkeypatch, tmp_path):
     assert 'id="menu-toggle"' in html
     assert 'id="nav-backdrop"' in html
     assert 'class="students-cards-view"' not in html
+
+
+def test_teacher_dashboard_data_ready_uses_scoped_rows(monkeypatch, tmp_path):
+    data_dir = tmp_path / "data"
+    data_dir.mkdir()
+    (data_dir / "students.csv").write_text(
+        _students_csv().replace("Chuck,MASTER", "Barbara,MASTER"),
+        encoding="utf-8",
+    )
+    (data_dir / "lessons.csv").write_text(_lessons_csv(), encoding="utf-8")
+
+    monkeypatch.setattr(web_app, "DATA_DIR", data_dir)
+    monkeypatch.setattr(web_app, "OUT_DIR", tmp_path / "output")
+    web_app.OUT_DIR.mkdir()
+    _init_teacher_store(monkeypatch, data_dir)
+
+    client = web_app.app.test_client()
+    _login(client, email="teacher@test.local", password="teachpass")
+    response = client.get("/")
+
+    assert response.status_code == 200
+    html = response.get_data(as_text=True)
+    assert "Gerar todos os relatórios" not in html
+    assert "Dados não encontrados" in html
 
 
 def test_students_page_has_dual_view_markup(monkeypatch, tmp_path):

@@ -96,6 +96,7 @@
 function openPrint(e, url) {
   e.preventDefault();
   const w = window.open(url, '_blank');
+  if (!w) return;
   w.addEventListener('load', () => w.print());
 }
 </script>
