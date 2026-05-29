@@ -114,7 +114,7 @@ def pie_path(percentage, cx=58, cy=58, r=48):
 # ── Data helpers ──────────────────────────────────────────────────────────────
 
 def load_csv(path):
-    with open(path, encoding="utf-8") as f:
+    with open(path, encoding="utf-8-sig") as f:
         return list(csv.DictReader(f))
 
 

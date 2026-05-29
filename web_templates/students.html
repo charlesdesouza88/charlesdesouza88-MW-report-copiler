@@ -117,17 +117,24 @@
 
 {% block scripts %}
 <script>
+function applyStudentTurmaFilter(turma) {
+  document.querySelectorAll('.filter-btn').forEach(btn => {
+    btn.className = btn.dataset.turma === turma ? 'btn btn-sm btn-primary filter-btn' : 'btn btn-sm btn-ghost filter-btn';
+  });
+  document.querySelectorAll('.student-row, .student-card-item').forEach(row => {
+    row.style.display = (!turma || row.dataset.turma === turma) ? '' : 'none';
+  });
+}
+
 document.querySelectorAll('.filter-btn').forEach(btn => {
   btn.addEventListener('click', () => {
-    const turma = btn.dataset.turma;
-    document.querySelectorAll('.filter-btn').forEach(b => {
-      b.className = 'btn btn-sm btn-ghost filter-btn';
-    });
-    btn.className = 'btn btn-sm btn-primary filter-btn';
-    document.querySelectorAll('.student-row, .student-card-item').forEach(row => {
-      row.style.display = (!turma || row.dataset.turma === turma) ? '' : 'none';
-    });
+    applyStudentTurmaFilter(btn.dataset.turma);
   });
 });
+
+const initialTurma = new URLSearchParams(window.location.search).get('turma');
+if (initialTurma) {
+  applyStudentTurmaFilter(initialTurma);
+}
 </script>
 {% endblock %}

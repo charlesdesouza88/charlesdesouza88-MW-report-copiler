@@ -102,24 +102,24 @@
 
 {% block scripts %}
 <script>
-const params = new URLSearchParams(window.location.search);
-const initialTurma = params.get('turma');
-if (initialTurma) {
-  const preset = document.querySelector('.filter-btn[data-turma="' + initialTurma + '"]');
-  if (preset) preset.click();
+function applyLessonTurmaFilter(turma) {
+  document.querySelectorAll('.filter-btn').forEach(btn => {
+    btn.className = btn.dataset.turma === turma ? 'btn btn-sm btn-primary filter-btn' : 'btn btn-sm btn-ghost filter-btn';
+  });
+  document.querySelectorAll('.lesson-row, .lesson-card-item').forEach(row => {
+    row.style.display = (!turma || row.dataset.turma === turma) ? '' : 'none';
+  });
 }
 
 document.querySelectorAll('.filter-btn').forEach(btn => {
   btn.addEventListener('click', () => {
-    const turma = btn.dataset.turma;
-    document.querySelectorAll('.filter-btn').forEach(b => {
-      b.className = 'btn btn-sm btn-ghost filter-btn';
-    });
-    btn.className = 'btn btn-sm btn-primary filter-btn';
-    document.querySelectorAll('.lesson-row, .lesson-card-item').forEach(row => {
-      row.style.display = (!turma || row.dataset.turma === turma) ? '' : 'none';
-    });
+    applyLessonTurmaFilter(btn.dataset.turma);
   });
 });
+
+const initialTurma = new URLSearchParams(window.location.search).get('turma');
+if (initialTurma) {
+  applyLessonTurmaFilter(initialTurma);
+}
 </script>
 {% endblock %}
