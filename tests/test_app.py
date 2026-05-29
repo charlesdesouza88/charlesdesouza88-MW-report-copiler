@@ -215,11 +215,11 @@ def test_oversized_upload_shows_user_facing_error(monkeypatch, tmp_path):
     monkeypatch.setattr(web_app, "OUT_DIR", tmp_path / "output")
     web_app.DATA_DIR.mkdir()
     web_app.OUT_DIR.mkdir()
-    monkeypatch.setitem(web_app.app.config, "MAX_CONTENT_LENGTH", 10)
     _init_user_store(monkeypatch, web_app.DATA_DIR)
 
     client = web_app.app.test_client()
     _login(client)
+    monkeypatch.setitem(web_app.app.config, "MAX_CONTENT_LENGTH", 10)
     response = client.post(
         "/upload",
         data={"students": (io.BytesIO(b"x" * 100), "students.csv")},
