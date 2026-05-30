@@ -1,4 +1,5 @@
 import io
+import json
 from pathlib import Path
 
 import app as web_app
@@ -135,6 +136,48 @@ def test_generate_reports_writes_html_files(monkeypatch, tmp_path):
     generated = sorted(p.name for p in out_dir.glob("*.html"))
     assert any(name.endswith("_report.html") for name in generated)
     assert any("class_diagnostic" in name for name in generated)
+
+
+def test_reports_page_with_null_prior_snapshot(monkeypatch, tmp_path):
+    data_dir = tmp_path / "data"
+    out_dir = tmp_path / "output"
+    data_dir.mkdir()
+    out_dir.mkdir()
+    (data_dir / "students.csv").write_text(_students_csv(), encoding="utf-8")
+    (data_dir / "lessons.csv").write_text(_lessons_csv(), encoding="utf-8")
+    (out_dir / "MASTER_Jane_Doe_2026-03_report.html").write_text("<html>ok</html>", encoding="utf-8")
+    (data_dir / "student_snapshots.json").write_text(
+        json.dumps(
+            [
+                {
+                    'report_month': '2026-03',
+                    'turma': 'MASTER',
+                    'student_name': 'Jane Doe',
+                    'composite_score': 4,
+                },
+                {
+                    'report_month': '2026-02',
+                    'turma': 'MASTER',
+                    'student_name': 'Jane Doe',
+                    'composite_score': None,
+                },
+            ],
+            ensure_ascii=False,
+        ),
+        encoding='utf-8',
+    )
+
+    _init_user_store(monkeypatch, data_dir)
+    monkeypatch.setattr(web_app, "DATA_DIR", data_dir)
+    monkeypatch.setattr(web_app, "OUT_DIR", out_dir)
+    monkeypatch.setattr(web_app, "SNAPSHOTS_PATH", data_dir / "student_snapshots.json")
+
+    client = web_app.app.test_client()
+    _login(client)
+    response = client.get("/reports?month=2026-03")
+
+    assert response.status_code == 200
+    assert "Jane" in response.get_data(as_text=True)
 
 
 def test_generate_missing_csv_shows_upload_error(monkeypatch, tmp_path):

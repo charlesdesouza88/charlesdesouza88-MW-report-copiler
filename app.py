@@ -1572,9 +1572,12 @@ def _trend_for_report_file(path, month, students, lessons, snapshots):
         try:
             ctx = build_student_ctx(student, lessons, report_month=month)
             composite = student_composite_score(ctx)
-        except (ValueError, KeyError):
+        except (ValueError, KeyError, TypeError):
             return None
-    return compute_month_trend(composite, month, snapshots, turma, name)
+    try:
+        return compute_month_trend(composite, month, snapshots, turma, name)
+    except (TypeError, ValueError, KeyError):
+        return None
 
 
 @app.route('/generate', methods=['POST'])
@@ -1694,29 +1697,29 @@ def manage_teachers():
 @app.route('/reports')
 @login_required
 def reports():
-    all_students, students = _scoped_students()
-    _, lessons = _scoped_lessons(all_students)
-    selected_month = (request.args.get('month') or '').strip()
-    available_months = available_report_months(lessons)
-    if selected_month and selected_month not in available_months:
-        selected_month = ''
-
-    files = filter_reports_for_user(sorted(OUT_DIR.glob('*.html')), all_students, _current_user())
-    files = filter_report_files_by_month(files, selected_month)
-    individual = [f for f in files if 'class_diagnostic' not in f.name]
-    diagnostics = [f for f in files if 'class_diagnostic' in f.name]
-
-    snapshots = load_snapshots(SNAPSHOTS_PATH)
-    report_trends = {}
-    report_months = {}
-    for path in individual:
-        month = report_month_from_filename(path.name) or selected_month
-        report_months[path.name] = month
-        trend = _trend_for_report_file(path, month, students, lessons, snapshots)
-        if trend:
-            report_trends[path.name] = trend
-
     try:
+        all_students, students = _scoped_students()
+        _, lessons = _scoped_lessons(all_students)
+        selected_month = (request.args.get('month') or '').strip()
+        available_months = available_report_months(lessons)
+        if selected_month and selected_month not in available_months:
+            selected_month = ''
+
+        files = filter_reports_for_user(sorted(OUT_DIR.glob('*.html')), all_students, _current_user())
+        files = filter_report_files_by_month(files, selected_month)
+        individual = [f for f in files if 'class_diagnostic' not in f.name]
+        diagnostics = [f for f in files if 'class_diagnostic' in f.name]
+
+        snapshots = load_snapshots(SNAPSHOTS_PATH)
+        report_trends = {}
+        report_months = {}
+        for path in individual:
+            month = report_month_from_filename(path.name) or selected_month
+            report_months[path.name] = month
+            trend = _trend_for_report_file(path, month, students, lessons, snapshots)
+            if trend:
+                report_trends[path.name] = trend
+
         return render_template(
             'reports.html',
             individual=individual,
@@ -1732,6 +1735,9 @@ def reports():
         session['generate_error'] = (
             'Não foi possível abrir a lista de relatórios. Tente gerar novamente.'
         )
+        user = _current_user()
+        if user and has_full_data_access(user.get('role', '')):
+            session['generate_error_detail'] = str(exc)[:300]
         return redirect(url_for('dashboard'))
 
 

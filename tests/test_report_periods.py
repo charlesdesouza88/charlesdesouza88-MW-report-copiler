@@ -65,6 +65,15 @@ def test_compute_month_trend():
     first = compute_month_trend(4, '2026-02', {}, 'MASTER', 'Jane')
     assert first['direction'] == 'first'
 
+    null_prior = compute_month_trend(
+        4,
+        '2026-03',
+        {'MASTER|Jane|2026-02': {'composite_score': None}},
+        'MASTER',
+        'Jane',
+    )
+    assert null_prior['direction'] == 'first'
+
 
 def test_previous_calendar_month():
     assert previous_calendar_month('2026-03') == '2026-02'

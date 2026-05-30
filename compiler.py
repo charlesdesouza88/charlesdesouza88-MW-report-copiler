@@ -167,7 +167,8 @@ def lessons_for(turma, all_lessons, report_month=None):
     rows = [
         lesson
         for lesson in all_lessons
-        if lesson["turma"] == turma and lesson["aula_num"].strip()
+        if (lesson.get('turma') or '').strip() == turma
+        and (lesson.get('aula_num') or '').strip()
     ]
     if not report_month:
         return rows

@@ -85,6 +85,15 @@ def student_composite_score(ctx):
     )
 
 
+def _as_int_score(value, default=0):
+    if value is None:
+        return default
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
 def compute_month_trend(current_score, report_month, snapshots, turma, student_name):
     """Compare composite score to the previous calendar month's snapshot."""
     prev_month = previous_calendar_month(report_month)
@@ -96,8 +105,11 @@ def compute_month_trend(current_score, report_month, snapshots, turma, student_n
     if not prior:
         return _trend('first', None, current_score)
 
-    prior_score = int(prior.get('composite_score', 0))
-    delta = int(current_score) - prior_score
+    raw_prior = prior.get('composite_score')
+    if raw_prior is None:
+        return _trend('first', None, current_score)
+    prior_score = _as_int_score(raw_prior, 0)
+    delta = _as_int_score(current_score) - prior_score
     if delta > 0:
         return _trend('improved', delta, current_score, prior_score)
     if delta < 0:
