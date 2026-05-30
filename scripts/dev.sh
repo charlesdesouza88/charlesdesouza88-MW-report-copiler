@@ -11,7 +11,7 @@ if [[ ! -d .venv ]]; then
 fi
 
 echo "Installing dependencies..."
-.venv/bin/pip install -q -r requirements.txt
+.venv/bin/pip install -q -r requirements-dev.txt
 
 echo ""
 echo "Running tests..."

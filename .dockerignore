@@ -1,0 +1,10 @@
+.venv
+__pycache__
+*.pyc
+.pytest_cache
+.git
+.env
+.tmp-mobile-debug
+data/imported
+data/teachers
+*.DS_Store
