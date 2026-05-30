@@ -34,31 +34,24 @@
         <input type="text" name="teacher" value="{{ student.teacher or '' }}">
         {% endif %}
       </div>
-      {% if allow_teacher_class_pick and is_new and teacher_class_options %}
+      {% if allow_teacher_class_pick and teacher_class_options %}
       <div class="form-group" style="grid-column: 1 / -1;">
         <label>Turma *</label>
         <select name="class_choice" id="class-choice" required>
           {% for c in teacher_class_options %}
-          <option value="{{ c.turma }}" {% if class_choice == c.turma %}selected{% endif %}>{{ c.turma_display }}</option>
+          <option value="{{ c.turma }}" {% if class_choice == c.turma %}selected{% endif %}>
+            {{ c.turma_display }}{% if c.horario %} — {{ c.horario }}{% elif c.needs_schedule %} — (complete no Dashboard){% endif %}
+          </option>
           {% endfor %}
         </select>
         <p class="font-sm text-gray" style="margin-top:6px;">
-          Turmas criadas no Dashboard — dias e horário vêm da turma escolhida.
+          Turmas do Dashboard — dias e horário vêm da turma escolhida.
           <a href="{{ url_for('dashboard') }}#criar-turma">+ Criar turma</a>
         </p>
       </div>
       {% elif current_user and current_user.role == 'teacher' %}
-      <div class="form-group">
-        <label>Turma (ID)</label>
-        <input type="text" name="turma" value="{{ student.turma or '' }}" readonly style="background:#f4f4f4;">
-      </div>
-      <div class="form-group">
-        <label>Turma (nome exibido)</label>
-        <input type="text" name="turma_display" value="{{ student.turma_display or '' }}" readonly style="background:#f4f4f4;">
-      </div>
-      <div class="form-group" style="grid-column: 1 / -1;">
-        <label>Horário da turma</label>
-        <input type="text" name="horario" value="{{ student.horario or '' }}" readonly style="background:#f4f4f4;">
+      <div class="alert alert-warning" style="grid-column: 1 / -1;">
+        Nenhuma turma cadastrada. <a href="{{ url_for('dashboard') }}#criar-turma">Crie uma turma no Dashboard</a> antes de salvar.
       </div>
       {% else %}
       <div class="form-group">

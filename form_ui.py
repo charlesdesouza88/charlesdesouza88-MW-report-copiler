@@ -120,12 +120,36 @@ def format_weekdays_label(weekdays):
     return f'{days[0]} e {days[1]}'
 
 
-def format_class_schedule(weekdays=None, class_time=''):
-    """Human-readable schedule line for turma registry (two weekdays + clock time)."""
+def format_class_time_range(time_start='', time_end='', class_time=''):
+    """Clock range for storage/display (e.g. 19:00 - 20:00)."""
+    start = (time_start or '').strip()
+    end = (time_end or '').strip()
+    legacy = (class_time or '').strip()
+    if not start and legacy:
+        start, end = parse_time_range_from_horario(legacy) if ' - ' in legacy else (legacy, '')
+    if start and end:
+        return f'{start} - {end}'
+    return start or end
+
+
+def parse_time_range_from_horario(horario):
+    """Extract start/end HH:MM from text like 'Terça e quinta, 19:00 - 20:00'."""
+    raw = (horario or '').strip()
+    match = re.search(r'(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})', raw)
+    if not match:
+        return '', ''
+    return (
+        time_input_to_storage(match.group(1)),
+        time_input_to_storage(match.group(2)),
+    )
+
+
+def format_class_schedule(weekdays=None, time_start='', time_end='', class_time=''):
+    """Human-readable schedule line for turma registry (two weekdays + time range)."""
     if weekdays is None:
         weekdays = []
     day_part = format_weekdays_label(weekdays)
-    time_part = (class_time or '').strip()
+    time_part = format_class_time_range(time_start, time_end, class_time)
     if day_part and time_part:
         return f'{day_part} {time_part}'
     return day_part or time_part

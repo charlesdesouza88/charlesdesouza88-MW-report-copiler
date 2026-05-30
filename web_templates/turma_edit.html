@@ -1,0 +1,68 @@
+{% extends 'base.html' %}
+{% block title %}Editar turma{% endblock %}
+{% block page_title %}Editar turma: {{ edit_class.turma_display }}{% endblock %}
+
+{% block topbar_actions %}
+  <a href="{{ url_for('dashboard') }}#criar-turma" class="btn btn-ghost">← Voltar ao Dashboard</a>
+{% endblock %}
+
+{% block content %}
+{% if form_error %}
+<div class="alert" style="background:#FADBD8; color:#A93226; border:1px solid #F1948A;">✕ &nbsp;{{ form_error }}</div>
+{% endif %}
+
+{% if student_count > 0 %}
+<p class="font-sm text-gray" style="margin:0 0 16px;">
+  {{ student_count }} aluno(s) vinculado(s) a esta turma. Ao salvar, o nome exibido e o horário serão atualizados nesses alunos.
+</p>
+{% endif %}
+
+<form method="post" style="max-width: 640px;">
+  <div class="form-section">
+    <div class="form-group" style="margin-bottom:12px;">
+      <label>Identificador da turma</label>
+      <input type="text" value="{{ turma_code }}" readonly style="background:#f4f4f4;">
+      <p class="font-sm text-gray" style="margin-top:6px;">O identificador não muda — os alunos continuam vinculados a ele.</p>
+    </div>
+    <div class="form-group">
+      <label>Nome da turma *</label>
+      <input type="text" name="turma_display" value="{{ edit_class.turma_display or '' }}" required placeholder="ex: Turma Kids manhã">
+    </div>
+    <div class="form-grid form-grid-2" style="gap:12px; margin-top:12px;">
+      {% set wd = edit_class.class_weekdays or [] %}
+      <div class="form-group">
+        <label>1º dia da semana *</label>
+        <select name="class_weekday_1" required>
+          <option value="">— Selecione —</option>
+          {% for d in weekday_choices %}
+          <option value="{{ d }}" {% if wd|length > 0 and wd[0] == d %}selected{% endif %}>{{ d }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-group">
+        <label>2º dia da semana *</label>
+        <select name="class_weekday_2" required>
+          <option value="">— Selecione —</option>
+          {% for d in weekday_choices %}
+          <option value="{{ d }}" {% if wd|length > 1 and wd[1] == d %}selected{% endif %}>{{ d }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Início *</label>
+        <input type="time" name="turma_time_start" class="input-datetime" step="900" required
+               value="{{ edit_class.class_time_start or '' }}" aria-label="Horário de início">
+      </div>
+      <div class="form-group">
+        <label>Término *</label>
+        <input type="time" name="turma_time_end" class="input-datetime" step="900" required
+               value="{{ edit_class.class_time_end or '' }}" aria-label="Horário de término">
+      </div>
+    </div>
+  </div>
+  <div class="form-actions-bar">
+    <button type="submit" class="btn btn-primary">✓ &nbsp;Salvar turma</button>
+    <a href="{{ url_for('dashboard') }}#criar-turma" class="btn btn-ghost">Cancelar</a>
+  </div>
+</form>
+{% endblock %}

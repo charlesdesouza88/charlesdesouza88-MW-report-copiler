@@ -6,7 +6,13 @@ from collections import Counter
 from pathlib import Path
 
 from auth import normalize_teacher_name
-from form_ui import format_class_schedule, is_valid_nivel, normalize_weekdays, turma_code_from_display
+from form_ui import (
+    format_class_schedule,
+    is_valid_nivel,
+    normalize_weekdays,
+    parse_time_range_from_horario,
+    turma_code_from_display,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -45,11 +51,17 @@ def _weekdays_from_row(row):
 
 def _schedule_fields(row):
     weekdays = _weekdays_from_row(row)
-    class_time = (row.get('class_time') or '').strip()
+    time_start = (row.get('class_time_start') or row.get('class_time') or '').strip()
+    time_end = (row.get('class_time_end') or '').strip()
     horario = (row.get('horario') or '').strip()
-    if not horario and (weekdays or class_time):
-        horario = format_class_schedule(weekdays, class_time)
-    return weekdays, class_time, horario
+    if not time_end and horario:
+        parsed_start, parsed_end = parse_time_range_from_horario(horario)
+        if parsed_start:
+            time_start = time_start or parsed_start
+        time_end = parsed_end
+    if not horario and (weekdays or time_start or time_end):
+        horario = format_class_schedule(weekdays, time_start, time_end)
+    return weekdays, time_start, time_end, horario
 
 
 def list_for_teacher(data, teacher_name):
@@ -65,14 +77,15 @@ def list_for_teacher(data, teacher_name):
             continue
         turma = (row.get('turma') or '').strip()
         if turma:
-            weekdays, class_time, horario = _schedule_fields(row)
+            weekdays, time_start, time_end, horario = _schedule_fields(row)
             out.append({
                 'turma': turma,
                 'turma_display': (row.get('turma_display') or turma).strip(),
                 'class_weekdays': weekdays,
-                'class_time': class_time,
+                'class_time_start': time_start,
+                'class_time_end': time_end,
                 'horario': horario,
-                'needs_schedule': len(weekdays) < 2 or not class_time,
+                'needs_schedule': len(weekdays) < 2 or not time_start or not time_end,
             })
     return sorted(out, key=lambda r: (r['turma_display'].casefold(), r['turma']))
 
@@ -89,12 +102,81 @@ def find_class(data, teacher_name, turma):
     return None
 
 
+def count_students_in_turma(students, teacher_name, turma):
+    """Students assigned to this teacher's turma code."""
+    key = normalize_teacher_name(teacher_name).casefold()
+    code = (turma or '').strip()
+    if not key or not code:
+        return 0
+    total = 0
+    for row in students:
+        if normalize_teacher_name(row.get('teacher', '')).casefold() != key:
+            continue
+        if (row.get('turma') or '').strip() == code:
+            total += 1
+    return total
+
+
+def _teacher_bucket(data, teacher_name):
+    key = normalize_teacher_name(teacher_name)
+    if not key:
+        return None, None
+    bucket = data.get(key)
+    if bucket is not None:
+        return key, bucket
+    for k, bucket in data.items():
+        if k.casefold() == key.casefold():
+            return k, bucket
+    return key, None
+
+
+def remove_class(data, teacher_name, turma, students=None):
+    """
+    Remove a turma from the teacher registry.
+    Returns (True, None) or (False, error_message).
+    """
+    key, bucket = _teacher_bucket(data, teacher_name)
+    if not key:
+        return False, 'Professor não identificado.'
+
+    code = (turma or '').strip()
+    if not code:
+        return False, 'Turma não informada.'
+
+    if students is not None:
+        linked = count_students_in_turma(students, teacher_name, code)
+        if linked:
+            label = 'aluno' if linked == 1 else 'alunos'
+            return False, (
+                f'Não é possível excluir: {linked} {label} ainda vinculado(s) a esta turma. '
+                'Altere a turma deles em Alunos antes de excluir.'
+            )
+
+    if not isinstance(bucket, list):
+        return False, 'Turma não encontrada.'
+
+    kept = [
+        row for row in bucket
+        if isinstance(row, dict) and (row.get('turma') or '').strip() != code
+    ]
+    if len(kept) == len(bucket):
+        return False, 'Turma não encontrada.'
+
+    if kept:
+        data[key] = kept
+    else:
+        data.pop(key, None)
+    return True, None
+
+
 def add_class(
     data,
     teacher_name,
     *,
     turma_display,
     class_weekdays=None,
+    class_time_start='',
+    class_time_end='',
     class_time='',
     horario='',
     turma='',
@@ -115,15 +197,20 @@ def add_class(
     if len(weekdays) < 2:
         return None, 'Selecione dois dias da semana diferentes (a turma tem aula 2x por semana).'
 
-    class_time = (class_time or '').strip()
-    if not class_time:
-        return None, 'Informe o horário da turma.'
+    time_start = (class_time_start or class_time or '').strip()
+    time_end = (class_time_end or '').strip()
+    if not time_start or not time_end:
+        return None, 'Informe o horário de início e de término da turma.'
+    if time_start >= time_end:
+        return None, 'O horário de término deve ser depois do horário de início.'
 
     code = (turma or '').strip() or turma_code_from_display(display)
     if not code:
         return None, 'Não foi possível gerar o identificador da turma.'
 
-    horario = (horario or '').strip() or format_class_schedule(weekdays, class_time)
+    horario = (horario or '').strip() or format_class_schedule(
+        weekdays, time_start, time_end,
+    )
 
     bucket = data.setdefault(key, [])
     if not isinstance(bucket, list):
@@ -140,11 +227,71 @@ def add_class(
         'turma': code,
         'turma_display': display,
         'class_weekdays': weekdays,
-        'class_time': class_time,
+        'class_time_start': time_start,
+        'class_time_end': time_end,
         'horario': horario,
     }
     bucket.append(new_row)
     return new_row, None
+
+
+def update_class(
+    data,
+    teacher_name,
+    turma,
+    *,
+    turma_display,
+    class_weekdays=None,
+    class_time_start='',
+    class_time_end='',
+):
+    """
+    Update an existing turma (code stays the same). Returns (row, None) or (None, error).
+    """
+    key, bucket = _teacher_bucket(data, teacher_name)
+    if not key:
+        return None, 'Professor não identificado.'
+
+    code = (turma or '').strip()
+    if not code:
+        return None, 'Turma não informada.'
+
+    display = (turma_display or '').strip()
+    if not display:
+        return None, 'Informe o nome da turma.'
+
+    weekdays = normalize_weekdays(class_weekdays or [])
+    if len(weekdays) < 2:
+        return None, 'Selecione dois dias da semana diferentes (a turma tem aula 2x por semana).'
+
+    time_start = (class_time_start or '').strip()
+    time_end = (class_time_end or '').strip()
+    if not time_start or not time_end:
+        return None, 'Informe o horário de início e de término da turma.'
+    if time_start >= time_end:
+        return None, 'O horário de término deve ser depois do horário de início.'
+
+    horario = format_class_schedule(weekdays, time_start, time_end)
+
+    if not isinstance(bucket, list):
+        return None, 'Turma não encontrada.'
+
+    for i, row in enumerate(bucket):
+        if not isinstance(row, dict) or (row.get('turma') or '').strip() != code:
+            continue
+        updated = {
+            'turma': code,
+            'turma_display': display,
+            'class_weekdays': weekdays,
+            'class_time_start': time_start,
+            'class_time_end': time_end,
+            'horario': horario,
+        }
+        bucket[i] = updated
+        data[key] = bucket
+        return updated, None
+
+    return None, 'Turma não encontrada.'
 
 
 def class_display_from_student_rows(student_rows, turma_code):
@@ -194,11 +341,13 @@ def sync_teacher_classes_from_students(data, teacher_name, students):
             if candidate:
                 horario = candidate
                 break
+        time_start, time_end = parse_time_range_from_horario(horario)
         bucket.append({
             'turma': code,
             'turma_display': class_display_from_student_rows(rows, code),
             'class_weekdays': [],
-            'class_time': '',
+            'class_time_start': time_start,
+            'class_time_end': time_end,
             'horario': horario,
             'legacy_import': True,
         })

@@ -53,12 +53,15 @@ def _seed_teacher_classes(data_dir, teacher_name, *entries):
     for entry in entries:
         turma, display = entry[0], entry[1]
         weekdays = list(entry[2:4]) if len(entry) > 2 else []
+        time_start = entry[4] if len(entry) > 4 else "19:00"
+        time_end = entry[5] if len(entry) > 5 else "20:00"
         bucket.append({
             "turma": turma,
             "turma_display": display or turma,
             "class_weekdays": weekdays,
-            "class_time": entry[4] if len(entry) > 4 else "19:00",
-            "horario": format_class_schedule(weekdays, entry[4] if len(entry) > 4 else "19:00")
+            "class_time_start": time_start,
+            "class_time_end": time_end,
+            "horario": format_class_schedule(weekdays, time_start, time_end)
             if weekdays else "",
         })
     save_registry(path, data)
@@ -504,6 +507,105 @@ def test_teacher_cannot_create_student_in_other_turma(monkeypatch, tmp_path):
     assert "Mallory" not in (data_dir / "students.csv").read_text(encoding="utf-8")
 
 
+def test_teacher_edits_turma_and_updates_students(monkeypatch, tmp_path):
+    data_dir = tmp_path / "data"
+    data_dir.mkdir()
+    csv = (
+        "teacher,turma,turma_display,nivel,horario,student_name,participacao,comportamento,"
+        "speaking,listening,foco,writing,reading,gramatica,trabalho_equipe,organizacao,"
+        "pontualidade,respeito_regras,faltas,missed_aulas,aula_extra,feedback_participacao,"
+        "feedback_foco,feedback_trabalho_equipe,recomendacoes,observacao\n"
+        "Chuck,MASTER,Masters,TEENS 4,Old schedule,Kid One,3,3,3,3,3,3,3,3,3,3,3,3,0,,,,,,,\n"
+    )
+    (data_dir / "students.csv").write_text(csv, encoding="utf-8")
+    monkeypatch.setattr(web_app, "DATA_DIR", data_dir)
+    monkeypatch.setattr(web_app, "OUT_DIR", tmp_path / "output")
+    web_app.OUT_DIR.mkdir()
+    _init_teacher_store(monkeypatch, data_dir, teacher_name="Chuck")
+    _seed_teacher_classes(
+        data_dir,
+        "Chuck",
+        ("MASTER", "Masters", "Segunda-feira", "Quarta-feira", "09:00", "10:00"),
+    )
+
+    client = web_app.app.test_client()
+    _login(client, email="teacher@test.local", password="teachpass")
+    html = client.get("/turmas/MASTER/edit").get_data(as_text=True)
+    assert "Editar turma" in html
+    assert 'name="turma_display"' in html
+
+    response = client.post(
+        "/turmas/MASTER/edit",
+        data={
+            "turma_display": "Masters Evening",
+            "class_weekday_1": "Terça-feira",
+            "class_weekday_2": "Quinta-feira",
+            "turma_time_start": "19:00",
+            "turma_time_end": "20:00",
+        },
+        follow_redirects=True,
+    )
+    assert response.status_code == 200
+    assert "atualizada" in response.get_data(as_text=True)
+    saved = (data_dir / "students.csv").read_text(encoding="utf-8")
+    assert "Masters Evening" in saved
+    assert "Terça-feira e Quinta-feira 19:00 - 20:00" in saved
+
+
+def test_teacher_deletes_empty_turma(monkeypatch, tmp_path):
+    data_dir = tmp_path / "data"
+    data_dir.mkdir()
+    (data_dir / "students.csv").write_text(_students_csv(), encoding="utf-8")
+
+    monkeypatch.setattr(web_app, "DATA_DIR", data_dir)
+    monkeypatch.setattr(web_app, "OUT_DIR", tmp_path / "output")
+    web_app.OUT_DIR.mkdir()
+    _init_teacher_store(monkeypatch, data_dir, teacher_name="Chuck")
+    _seed_teacher_classes(
+        data_dir,
+        "Chuck",
+        ("ORPHAN", "Orphan class", "Segunda-feira", "Quarta-feira", "10:00", "11:00"),
+    )
+
+    client = web_app.app.test_client()
+    _login(client, email="teacher@test.local", password="teachpass")
+    response = client.post(
+        "/turmas/delete",
+        data={"turma": "ORPHAN"},
+        follow_redirects=True,
+    )
+    assert response.status_code == 200
+    assert "excluída" in response.get_data(as_text=True)
+    registry = (data_dir / "teacher_classes.json").read_text(encoding="utf-8")
+    assert "ORPHAN" not in registry
+
+
+def test_teacher_cannot_delete_turma_with_students(monkeypatch, tmp_path):
+    data_dir = tmp_path / "data"
+    data_dir.mkdir()
+    (data_dir / "students.csv").write_text(_students_csv(), encoding="utf-8")
+    monkeypatch.setattr(web_app, "DATA_DIR", data_dir)
+    monkeypatch.setattr(web_app, "OUT_DIR", tmp_path / "output")
+    web_app.OUT_DIR.mkdir()
+    _init_teacher_store(monkeypatch, data_dir, teacher_name="Chuck")
+    _seed_teacher_classes(
+        data_dir,
+        "Chuck",
+        ("MASTER", "Masters", "Terça-feira", "Quinta-feira", "19:00", "20:00"),
+    )
+
+    client = web_app.app.test_client()
+    _login(client, email="teacher@test.local", password="teachpass")
+    response = client.post(
+        "/turmas/delete",
+        data={"turma": "MASTER"},
+        follow_redirects=True,
+    )
+    assert response.status_code == 200
+    assert "Não é possível excluir" in response.get_data(as_text=True)
+    assert "MASTER" in (data_dir / "teacher_classes.json").read_text(encoding="utf-8")
+
+
 def test_teacher_creates_turma_on_dashboard(monkeypatch, tmp_path):
     data_dir = tmp_path / "data"
     data_dir.mkdir()
@@ -522,7 +624,8 @@ def test_teacher_creates_turma_on_dashboard(monkeypatch, tmp_path):
             "turma_display": "Kids segunda",
             "class_weekday_1": "Terça-feira",
             "class_weekday_2": "Quinta-feira",
-            "turma_time": "19:30",
+            "turma_time_start": "19:30",
+            "turma_time_end": "20:30",
         },
         follow_redirects=False,
     )
@@ -531,7 +634,7 @@ def test_teacher_creates_turma_on_dashboard(monkeypatch, tmp_path):
     assert "KIDS_SEGUNDA" in registry
     assert "Kids segunda" in registry
     assert "Terça-feira" in registry
-    assert "19:30" in registry
+    assert "19:30 - 20:30" in registry
 
 
 def test_students_page_shows_class_name_not_nivel(monkeypatch, tmp_path):
@@ -557,7 +660,8 @@ def test_students_page_shows_class_name_not_nivel(monkeypatch, tmp_path):
         "Chuck",
         turma_display="Turma Teens noite",
         class_weekdays=["Terça-feira", "Quinta-feira"],
-        class_time="19:00",
+        class_time_start="19:00",
+        class_time_end="20:00",
         turma="TEENS_1",
     )
     save_registry(web_app.TEACHER_CLASSES_PATH, data)
@@ -586,7 +690,8 @@ def test_teacher_adds_student_to_dashboard_turma(monkeypatch, tmp_path):
             "turma_display": "Kids 2 class",
             "class_weekday_1": "Segunda-feira",
             "class_weekday_2": "Quarta-feira",
-            "turma_time": "10:00",
+            "turma_time_start": "10:00",
+            "turma_time_end": "11:00",
         },
     )
 
@@ -614,6 +719,57 @@ def test_teacher_adds_student_to_dashboard_turma(monkeypatch, tmp_path):
     csv_text = (data_dir / "students.csv").read_text(encoding="utf-8")
     assert "New Class Kid" in csv_text
     assert "KIDS_2_CLASS" in csv_text
+
+
+def test_teacher_edits_csv_student_with_turma_dropdown(monkeypatch, tmp_path):
+    data_dir = tmp_path / "data"
+    data_dir.mkdir()
+    csv = (
+        "teacher,turma,turma_display,nivel,horario,student_name,participacao,comportamento,"
+        "speaking,listening,foco,writing,reading,gramatica,trabalho_equipe,organizacao,"
+        "pontualidade,respeito_regras,faltas,missed_aulas,aula_extra,feedback_participacao,"
+        "feedback_foco,feedback_trabalho_equipe,recomendacoes,observacao\n"
+        "Chuck,MASTER,Masters,TEENS 4,Terça e quinta 19:00 - 20:00,Bruna Vieira,5,3,5,3,3,4,4,4,3,3,3,3,0,,,,,,,\n"
+    )
+    (data_dir / "students.csv").write_text(csv, encoding="utf-8")
+    monkeypatch.setattr(web_app, "DATA_DIR", data_dir)
+    monkeypatch.setattr(web_app, "OUT_DIR", tmp_path / "output")
+    web_app.OUT_DIR.mkdir()
+    _init_teacher_store(monkeypatch, data_dir, teacher_name="Chuck")
+
+    client = web_app.app.test_client()
+    _login(client, email="teacher@test.local", password="teachpass")
+    edit_html = client.get("/students/0/edit").get_data(as_text=True)
+    assert 'name="class_choice"' in edit_html
+    assert "Selecione a turma do aluno" not in edit_html
+
+    response = client.post(
+        "/students/0/edit",
+        data={
+            "teacher": "Chuck",
+            "class_choice": "MASTER",
+            "nivel": "TEENS 4",
+            "student_name": "Bruna Vieira Matias",
+            "participacao": "5",
+            "comportamento": "3",
+            "speaking": "5",
+            "listening": "3",
+            "foco": "3",
+            "writing": "4",
+            "reading": "4",
+            "gramatica": "4",
+            "trabalho_equipe": "3",
+            "organizacao": "3",
+            "pontualidade": "3",
+            "respeito_regras": "3",
+            "faltas": "0",
+        },
+        follow_redirects=False,
+    )
+    assert response.status_code == 302
+    saved = (data_dir / "students.csv").read_text(encoding="utf-8")
+    assert "Bruna Vieira Matias" in saved
+    assert "Selecione a turma" not in client.get("/students/0/edit").get_data(as_text=True)
 
 
 def test_teacher_new_student_form_lists_dashboard_turmas(monkeypatch, tmp_path):

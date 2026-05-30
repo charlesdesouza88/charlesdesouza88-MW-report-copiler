@@ -134,8 +134,12 @@
           </select>
         </div>
         <div class="form-group">
-          <label>Horário *</label>
-          <input type="time" name="turma_time" class="input-datetime" step="900" required aria-label="Horário da turma">
+          <label>Início *</label>
+          <input type="time" name="turma_time_start" class="input-datetime" step="900" required aria-label="Horário de início da turma">
+        </div>
+        <div class="form-group">
+          <label>Término *</label>
+          <input type="time" name="turma_time_end" class="input-datetime" step="900" required aria-label="Horário de término da turma">
         </div>
       </div>
       <button type="submit" class="btn btn-primary" style="margin-top:12px;">+ Criar turma</button>
@@ -148,10 +152,16 @@
           <span style="font-weight:900; font-size:13px;">{{ c.turma_display }}</span>
           {% if c.horario %}<span class="font-sm text-gray" style="margin-left:8px;">{{ c.horario }}</span>{% elif c.needs_schedule %}<span class="font-sm text-gray" style="margin-left:8px;">— complete dias/horário</span>{% endif %}
         </div>
-        <div class="flex gap-8">
+        <div class="flex gap-8" style="align-items:center;">
           <a href="{{ url_for('student_new') }}?turma={{ c.turma }}" class="btn btn-ghost btn-xs">+ Aluno</a>
           <a href="{{ url_for('students') }}?turma={{ c.turma }}" class="btn btn-ghost btn-xs">Alunos</a>
           <a href="{{ url_for('lessons') }}?turma={{ c.turma }}" class="btn btn-ghost btn-xs">Aulas</a>
+          <a href="{{ url_for('turma_edit', turma=c.turma) }}" class="btn btn-ghost btn-xs">Editar</a>
+          <form method="post" action="{{ url_for('turma_delete') }}" style="margin:0;"
+                onsubmit="return confirm({{ ('Excluir a turma «' ~ c.turma_display ~ '»? Só é possível se não houver alunos vinculados.')|tojson }})">
+            <input type="hidden" name="turma" value="{{ c.turma }}">
+            <button type="submit" class="btn btn-ghost btn-xs" style="color:#A93226;">Excluir</button>
+          </form>
         </div>
       </div>
       {% endfor %}

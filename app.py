@@ -36,9 +36,12 @@ from form_ui import (NIVEL_CHOICES, WEEKDAY_CHOICES, date_from_form,
                      format_class_schedule, is_valid_nivel, storage_date_to_iso,
                      storage_time_to_input, time_from_form)
 from teacher_classes import (add_class as register_teacher_class,
-                             list_for_teacher, load_registry, save_registry,
-                             sync_teacher_classes_from_students,
-                             turma_codes_for_teacher)
+                             count_students_in_turma, find_class,
+                             list_for_teacher, load_registry,
+                             remove_class as delete_teacher_class,
+                             save_registry, sync_teacher_classes_from_students,
+                             turma_codes_for_teacher,
+                             update_class as update_teacher_class)
 from report_periods import (available_report_months, compute_month_trend,
                             default_report_month, filter_report_files_by_month,
                             individual_report_filename, load_snapshots,
@@ -678,6 +681,24 @@ def _teacher_class_options(teacher_name):
     return list_for_teacher(_load_teacher_class_registry(), teacher_name)
 
 
+def _teacher_class_options_for_form(teacher_name, student=None):
+    """Registry turmas plus the student's current turma when editing legacy rows."""
+    options = _teacher_class_options(teacher_name)
+    if not student:
+        return options
+    code = (student.get('turma') or '').strip()
+    if not code or code in {o['turma'] for o in options}:
+        return options
+    options = list(options)
+    options.append({
+        'turma': code,
+        'turma_display': _class_name_from_student_row(student),
+        'horario': (student.get('horario') or '').strip(),
+        'needs_schedule': True,
+    })
+    return sorted(options, key=lambda r: (r['turma_display'].casefold(), r['turma']))
+
+
 def _teacher_registered_turmas(teacher_name):
     return turma_codes_for_teacher(_load_teacher_class_registry(), teacher_name)
 
@@ -719,6 +740,8 @@ def _resolve_teacher_class_choice(row):
         return row
 
     choice = (request.form.get('class_choice') or '').strip()
+    if not choice:
+        choice = (row.get('turma') or '').strip()
     if choice:
         row['turma'] = choice
         registered = {
@@ -739,7 +762,11 @@ def _validate_student_row(row, all_students, user):
     nivel = (row.get('nivel') or '').strip()
     class_choice = (request.form.get('class_choice') or '').strip()
 
-    if user['role'] == ROLE_TEACHER and not class_choice:
+    if (
+        user['role'] == ROLE_TEACHER
+        and request.endpoint == 'student_new'
+        and not class_choice
+    ):
         registered = sorted(_teacher_registered_turmas(user.get('teacher_name', '')))
         if not registered:
             return 'Crie uma turma no Dashboard antes de cadastrar alunos.'
@@ -776,17 +803,22 @@ def _validate_student_row(row, all_students, user):
 def _student_form_context(all_rows, user, is_new, student, idx, form_error=None):
     teacher_class_options = []
     if user and user['role'] == ROLE_TEACHER:
-        teacher_class_options = _teacher_class_options(user.get('teacher_name', ''))
+        teacher_class_options = _teacher_class_options_for_form(
+            user.get('teacher_name', ''),
+            student,
+        )
     class_choice = ''
     if request.method == 'POST':
         class_choice = (request.form.get('class_choice') or '').strip()
+    elif user and user['role'] == ROLE_TEACHER and student and (student.get('turma') or '').strip():
+        class_choice = (student.get('turma') or '').strip()
     elif is_new and user and user['role'] == ROLE_TEACHER and teacher_class_options:
         wanted = (request.args.get('turma') or '').strip()
         codes = {c['turma'] for c in teacher_class_options}
         class_choice = wanted if wanted in codes else teacher_class_options[0]['turma']
 
     no_teacher_classes = bool(
-        is_new and user and user['role'] == ROLE_TEACHER and not teacher_class_options,
+        user and user['role'] == ROLE_TEACHER and not teacher_class_options,
     )
 
     return dict(
@@ -1192,7 +1224,8 @@ def turma_create():
         request.form.get('class_weekday_1') or '',
         request.form.get('class_weekday_2') or '',
     ]
-    class_time = time_from_form(request.form, field='turma_time')
+    class_time_start = time_from_form(request.form, field='turma_time_start')
+    class_time_end = time_from_form(request.form, field='turma_time_end')
 
     data = _load_teacher_class_registry()
     row, err = register_teacher_class(
@@ -1200,7 +1233,8 @@ def turma_create():
         user.get('teacher_name', ''),
         turma_display=turma_display,
         class_weekdays=class_weekdays,
-        class_time=class_time,
+        class_time_start=class_time_start,
+        class_time_end=class_time_end,
     )
     if err:
         session['turma_flash_error'] = err
@@ -1212,6 +1246,124 @@ def turma_create():
             'Agora você pode cadastrar alunos em + Novo aluno.'
         )
     return redirect(url_for('dashboard'))
+
+
+@app.route('/turmas/delete', methods=['POST'])
+@login_required
+def turma_delete():
+    user = _current_user()
+    if not user or user['role'] != ROLE_TEACHER:
+        abort(403)
+
+    turma = (request.form.get('turma') or '').strip()
+    all_students = _load_students()
+    data = _load_teacher_class_registry()
+    display = turma
+    found = find_class(data, user.get('teacher_name', ''), turma)
+    if found:
+        display = found.get('turma_display') or turma
+
+    ok, err = delete_teacher_class(
+        data,
+        user.get('teacher_name', ''),
+        turma,
+        students=all_students,
+    )
+    if err:
+        session['turma_flash_error'] = err
+    elif ok:
+        _save_teacher_class_registry(data)
+        session['turma_flash_ok'] = f'Turma "{display}" excluída.'
+    return redirect(url_for('dashboard'))
+
+
+def _propagate_turma_to_students(all_students, teacher_name, turma_code, class_row):
+    """Keep student rows aligned when a turma's name or schedule changes."""
+    teacher_key = normalize_teacher_name(teacher_name).casefold()
+    code = (turma_code or '').strip()
+    display = (class_row.get('turma_display') or '').strip()
+    horario = (class_row.get('horario') or '').strip()
+    updated = 0
+    for row in all_students:
+        if normalize_teacher_name(row.get('teacher', '')).casefold() != teacher_key:
+            continue
+        if (row.get('turma') or '').strip() != code:
+            continue
+        row['turma_display'] = display
+        row['horario'] = horario
+        updated += 1
+    return updated
+
+
+@app.route('/turmas/<turma>/edit', methods=['GET', 'POST'])
+@login_required
+def turma_edit(turma):
+    user = _current_user()
+    if not user or user['role'] != ROLE_TEACHER:
+        abort(403)
+
+    code = (turma or '').strip()
+    data = _load_teacher_class_registry()
+    existing = find_class(data, user.get('teacher_name', ''), code)
+    if not existing:
+        session['turma_flash_error'] = 'Turma não encontrada.'
+        return redirect(url_for('dashboard'))
+
+    if request.method == 'POST':
+        class_weekdays = [
+            request.form.get('class_weekday_1') or '',
+            request.form.get('class_weekday_2') or '',
+        ]
+        row, err = update_teacher_class(
+            data,
+            user.get('teacher_name', ''),
+            code,
+            turma_display=(request.form.get('turma_display') or '').strip(),
+            class_weekdays=class_weekdays,
+            class_time_start=time_from_form(request.form, field='turma_time_start'),
+            class_time_end=time_from_form(request.form, field='turma_time_end'),
+        )
+        if err:
+            return render_template(
+                'turma_edit.html',
+                turma_code=code,
+                edit_class={
+                    **existing,
+                    'turma_display': (request.form.get('turma_display') or '').strip(),
+                    'class_weekdays': class_weekdays,
+                    'class_time_start': time_from_form(request.form, field='turma_time_start'),
+                    'class_time_end': time_from_form(request.form, field='turma_time_end'),
+                },
+                weekday_choices=WEEKDAY_CHOICES,
+                form_error=err,
+                student_count=count_students_in_turma(
+                    _load_students(), user.get('teacher_name', ''), code,
+                ),
+            )
+        _save_teacher_class_registry(data)
+        all_students = _load_students()
+        linked = _propagate_turma_to_students(
+            all_students, user.get('teacher_name', ''), code, row,
+        )
+        if linked:
+            _save_students(all_students)
+        schedule = row.get('horario') or row['turma_display']
+        msg = f'Turma "{row["turma_display"]}" atualizada ({schedule}).'
+        if linked:
+            msg += f' {linked} aluno(s) atualizado(s) com o novo horário.'
+        session['turma_flash_ok'] = msg
+        return redirect(url_for('dashboard'))
+
+    return render_template(
+        'turma_edit.html',
+        turma_code=code,
+        edit_class=existing,
+        weekday_choices=WEEKDAY_CHOICES,
+        form_error=None,
+        student_count=count_students_in_turma(
+            _load_students(), user.get('teacher_name', ''), code,
+        ),
+    )
 
 
 def _class_name_from_student_row(row):
@@ -1274,6 +1426,8 @@ def student_edit(idx):
     if idx < 0 or idx >= len(visible):
         abort(404)
     user = _current_user()
+    if user and user['role'] == ROLE_TEACHER:
+        _sync_teacher_registry(user, all_rows)
     if request.method == 'POST':
         updated = _student_row_from_form()
         if user['role'] == ROLE_TEACHER:
@@ -1286,11 +1440,11 @@ def student_edit(idx):
                     all_rows, user, False, updated, idx, form_error=form_error,
                 ),
             )
-        visible[idx] = updated
         global_idx = find_student_global_index(all_rows, visible, idx)
         if global_idx is None:
             abort(404)
-        all_rows[global_idx] = visible[idx]
+        visible[idx] = updated
+        all_rows[global_idx] = updated
         _save_students(all_rows)
         return redirect(url_for('students'))
     return render_template(

@@ -118,8 +118,9 @@ def _setup_env(tmp: Path, admin_email: str = 'admin@test.local', admin_password:
             'turma': 'MASTER',
             'turma_display': 'Masters',
             'class_weekdays': ['Terça-feira', 'Quinta-feira'],
-            'class_time': '19:00',
-            'horario': 'Terça-feira e Quinta-feira 19:00',
+            'class_time_start': '19:00',
+            'class_time_end': '20:00',
+            'horario': 'Terça-feira e Quinta-feira 19:00 - 20:00',
         }],
     })
     web_app.db_store = None
@@ -217,7 +218,8 @@ def journey_teacher(client, runner: Runner):
             'turma_display': 'Teens class',
             'class_weekday_1': 'Terça-feira',
             'class_weekday_2': 'Quinta-feira',
-            'turma_time': '18:00',
+            'turma_time_start': '18:00',
+            'turma_time_end': '19:00',
         },
         follow_redirects=False,
     )

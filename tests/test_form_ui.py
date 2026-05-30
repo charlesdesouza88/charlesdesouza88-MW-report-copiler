@@ -3,6 +3,7 @@ from form_ui import (
     format_class_schedule,
     is_valid_nivel,
     is_valid_weekday,
+    parse_time_range_from_horario,
     turma_code_from_nivel,
 )
 
@@ -29,7 +30,14 @@ def test_is_valid_weekday():
 
 
 def test_format_class_schedule():
-    assert format_class_schedule(['Terça-feira', 'Quinta-feira'], '19:00') == (
-        'Terça-feira e Quinta-feira 19:00'
+    assert format_class_schedule(
+        ['Terça-feira', 'Quinta-feira'], '19:00', '20:00',
+    ) == 'Terça-feira e Quinta-feira 19:00 - 20:00'
+    assert format_class_schedule([], '19:00', '20:00') == '19:00 - 20:00'
+
+
+def test_parse_time_range_from_horario():
+    assert parse_time_range_from_horario('Terça e quinta, 19:00 - 20:00') == (
+        '19:00', '20:00',
     )
-    assert format_class_schedule([], '19:00') == '19:00'
+    assert parse_time_range_from_horario('Tue 19:00') == ('', '')
