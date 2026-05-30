@@ -968,6 +968,7 @@ def dashboard():
         data_ready = (DATA_DIR / 'students.csv').exists() and lessons_path.exists()
     db_status = _database_status()
     generate_error = session.pop('generate_error', None)
+    generate_error_detail = session.pop('generate_error_detail', None)
     return render_template('dashboard.html',
         student_count=len(students),
         turma_count=len(turmas),
@@ -979,6 +980,7 @@ def dashboard():
         available_months=available_report_months(lessons),
         default_month=default_report_month(lessons),
         generate_error=generate_error,
+        generate_error_detail=generate_error_detail,
     )
 
 
@@ -1507,6 +1509,14 @@ def _validate_generation_inputs(students, lessons):
 
 
 def _run_report_generation(students, lessons, report_month):
+    try:
+        OUT_DIR.mkdir(parents=True, exist_ok=True)
+        probe = OUT_DIR / '.mw_write_probe'
+        probe.write_text('ok', encoding='utf-8')
+        probe.unlink(missing_ok=True)
+    except OSError as exc:
+        raise RuntimeError(f'Cannot write reports to {OUT_DIR}: {exc}') from exc
+
     snapshots = load_snapshots(SNAPSHOTS_PATH)
     env = create_report_environment(TMPL_DIR)
     generate_individual_reports(
@@ -1525,21 +1535,46 @@ def _run_report_generation(students, lessons, report_month):
         logger.warning('Could not save monthly snapshots to %s: %s', SNAPSHOTS_PATH, exc)
 
 
-def _trend_for_report_file(path, month, students, lessons, snapshots):
-    if not month:
-        return None
+def _student_for_report_file(path, students, month):
     for student in students:
         turma = student.get('turma', '').strip()
         name = student.get('student_name', '').strip()
         if not turma or not name:
             continue
-        if individual_report_filename(turma, name, month) != path.name:
-            if individual_report_filename(turma, name) != path.name:
-                continue
-        ctx = build_student_ctx(student, lessons, report_month=month)
-        composite = student_composite_score(ctx)
-        return compute_month_trend(composite, month, snapshots, turma, name)
-    return None
+        if individual_report_filename(turma, name, month) == path.name:
+            return turma, name
+        if not month and individual_report_filename(turma, name) == path.name:
+            return turma, name
+    return None, None
+
+
+def _trend_for_report_file(path, month, students, lessons, snapshots):
+    """Trend badge for the reports list — prefer snapshots (fast), no full re-render."""
+    if not month:
+        return None
+    turma, name = _student_for_report_file(path, students, month)
+    if not turma or not name:
+        return None
+    from report_periods import _snapshot_key
+
+    snap_key = _snapshot_key(turma, name, month)
+    row = snapshots.get(snap_key)
+    if row and row.get('composite_score') is not None:
+        composite = int(row['composite_score'])
+    else:
+        student = None
+        for row in students:
+            if row.get('turma', '').strip() == turma and row.get('student_name', '').strip() == name:
+                student = row
+                break
+        if not student:
+            return None
+        try:
+            ctx = build_student_ctx(student, lessons, report_month=month)
+            composite = student_composite_score(ctx)
+        except (ValueError, KeyError):
+            return None
+    return compute_month_trend(composite, month, snapshots, turma, name)
 
 
 @app.route('/generate', methods=['POST'])
@@ -1591,6 +1626,8 @@ def generate():
             'Não foi possível gerar os relatórios. Verifique os dados de alunos e aulas '
             'e tente novamente. Se o problema continuar, contate o suporte.'
         )
+        if has_full_data_access(user.get('role', '')):
+            session['generate_error_detail'] = str(exc)[:300]
         return redirect(url_for('dashboard'))
 
     return redirect(url_for('reports', month=report_month))
