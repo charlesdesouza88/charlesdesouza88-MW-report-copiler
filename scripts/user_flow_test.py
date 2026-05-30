@@ -146,7 +146,7 @@ def run_inprocess():
         err_html = r.get_data(as_text=True)
         runner.check(
             'New student validation (missing turma)',
-            r.status_code == 200 and 'código da turma' in err_html,
+            r.status_code == 200 and 'Informe o nome do aluno e a turma' in err_html,
         )
 
         new_name = 'Flow Test Kid'
@@ -247,7 +247,7 @@ def run_live(base: str):
 
     bad_resp = post('/students/new', {'student_name': 'X', 'turma': '', 'teacher': 'Chuck'})
     bad_body = bad_resp.read().decode('utf-8', errors='replace')
-    runner.check('New student validation', 'código da turma' in bad_body)
+    runner.check('New student validation', 'Informe o nome do aluno e a turma' in bad_body)
 
     new_name = 'Live Flow Kid'
     try:

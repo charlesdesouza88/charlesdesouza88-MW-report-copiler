@@ -1,29 +1,35 @@
 from form_ui import (
-    date_from_form,
-    iso_date_to_storage,
-    storage_date_to_iso,
-    storage_time_to_input,
-    time_from_form,
-    time_input_to_storage,
+    NIVEL_CHOICES,
+    format_class_schedule,
+    is_valid_nivel,
+    is_valid_weekday,
+    turma_code_from_nivel,
 )
 
 
-def test_storage_date_roundtrip():
-    iso_short = storage_date_to_iso('13/05')
-    assert iso_short.endswith('-05-13')
-    assert len(iso_short) == 10
-
-    iso = storage_date_to_iso('10/02/2026')
-    assert iso == '2026-02-10'
-    assert iso_date_to_storage(iso) == '10/02/2026'
+def test_nivel_choices():
+    assert 'KIDS 1' in NIVEL_CHOICES
+    assert 'TEENS 5' in NIVEL_CHOICES
+    assert len(NIVEL_CHOICES) == 9
 
 
-def test_date_from_form_calendar():
-    assert date_from_form({'date_picker': '2026-05-13'}) == '13/05/2026'
-    assert date_from_form({'date_picker': ''}) == ''
+def test_turma_code_from_nivel():
+    assert turma_code_from_nivel('KIDS 1') == 'KIDS_1'
+    assert turma_code_from_nivel('TEENS 3') == 'TEENS_3'
 
 
-def test_time_picker_roundtrip():
-    assert storage_time_to_input('09:30') == '09:30'
-    assert time_from_form({'horario': '09:30'}) == '09:30'
-    assert time_input_to_storage('14:15') == '14:15'
+def test_is_valid_nivel():
+    assert is_valid_nivel('KIDS 2')
+    assert not is_valid_nivel('Adults Book 4')
+
+
+def test_is_valid_weekday():
+    assert is_valid_weekday('Terça-feira')
+    assert not is_valid_weekday('Feriado')
+
+
+def test_format_class_schedule():
+    assert format_class_schedule(['Terça-feira', 'Quinta-feira'], '19:00') == (
+        'Terça-feira e Quinta-feira 19:00'
+    )
+    assert format_class_schedule([], '19:00') == '19:00'

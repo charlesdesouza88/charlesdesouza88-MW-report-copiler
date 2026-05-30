@@ -10,7 +10,12 @@
 {% if form_error %}
 <div class="alert" style="background:#FADBD8; color:#A93226; border:1px solid #F1948A;">✕ &nbsp;{{ form_error }}</div>
 {% endif %}
-<form method="post" style="max-width: 860px;">
+{% if no_teacher_classes %}
+<div class="alert alert-warning" style="margin-bottom:16px;">
+  ⚠ &nbsp;Crie uma turma no <a href="{{ url_for('dashboard') }}#criar-turma">Dashboard</a> antes de cadastrar alunos.
+</div>
+{% endif %}
+<form method="post" style="max-width: 860px;"{% if no_teacher_classes %} class="disabled-form"{% endif %}>
 
   <!-- Info básica -->
   <div class="form-section">
@@ -29,6 +34,33 @@
         <input type="text" name="teacher" value="{{ student.teacher or '' }}">
         {% endif %}
       </div>
+      {% if allow_teacher_class_pick and is_new and teacher_class_options %}
+      <div class="form-group" style="grid-column: 1 / -1;">
+        <label>Turma *</label>
+        <select name="class_choice" id="class-choice" required>
+          {% for c in teacher_class_options %}
+          <option value="{{ c.turma }}" {% if class_choice == c.turma %}selected{% endif %}>{{ c.turma_display }}</option>
+          {% endfor %}
+        </select>
+        <p class="font-sm text-gray" style="margin-top:6px;">
+          Turmas criadas no Dashboard — dias e horário vêm da turma escolhida.
+          <a href="{{ url_for('dashboard') }}#criar-turma">+ Criar turma</a>
+        </p>
+      </div>
+      {% elif current_user and current_user.role == 'teacher' %}
+      <div class="form-group">
+        <label>Turma (ID)</label>
+        <input type="text" name="turma" value="{{ student.turma or '' }}" readonly style="background:#f4f4f4;">
+      </div>
+      <div class="form-group">
+        <label>Turma (nome exibido)</label>
+        <input type="text" name="turma_display" value="{{ student.turma_display or '' }}" readonly style="background:#f4f4f4;">
+      </div>
+      <div class="form-group" style="grid-column: 1 / -1;">
+        <label>Horário da turma</label>
+        <input type="text" name="horario" value="{{ student.horario or '' }}" readonly style="background:#f4f4f4;">
+      </div>
+      {% else %}
       <div class="form-group">
         <label>Turma (ID) *</label>
         <input type="text" name="turma" value="{{ student.turma or '' }}" placeholder="ex: MASTER" required>
@@ -37,14 +69,22 @@
         <label>Turma (nome exibido)</label>
         <input type="text" name="turma_display" value="{{ student.turma_display or '' }}" placeholder="ex: Masters">
       </div>
+      {% endif %}
       <div class="form-group">
-        <label>Nível</label>
-        <input type="text" name="nivel" value="{{ student.nivel or '' }}" placeholder="ex: Adults Book 4">
+        <label>Livro / nível do aluno{% if allow_teacher_class_pick and is_new %} *{% endif %}</label>
+        <select name="nivel" id="nivel-select" {% if allow_teacher_class_pick and is_new %}required{% endif %}>
+          <option value="">— Selecione —</option>
+          {% for n in nivel_choices %}
+          <option value="{{ n }}" {% if student.nivel == n %}selected{% endif %}>{{ n }}</option>
+          {% endfor %}
+        </select>
       </div>
+      {% if not current_user or current_user.role != 'teacher' %}
       <div class="form-group">
         <label>Horário</label>
         <input type="text" name="horario" value="{{ student.horario or '' }}" placeholder="ex: Terça e quinta, 19:00">
       </div>
+      {% endif %}
     </div>
   </div>
 
@@ -176,7 +216,9 @@
   </div>
 
   <div class="form-actions-bar">
+    {% if not no_teacher_classes %}
     <button type="submit" class="btn btn-primary">✓ &nbsp;{{ 'Criar aluno' if is_new else 'Salvar alterações' }}</button>
+    {% endif %}
     <a href="{{ url_for('students') }}" class="btn btn-ghost">Cancelar</a>
   </div>
 

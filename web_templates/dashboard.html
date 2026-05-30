@@ -95,9 +95,72 @@
     </div>
   </div>
 
-  <div class="card">
+  <div class="card" id="criar-turma">
     <div class="section-title" style="margin-bottom:14px">Turmas ativas</div>
-    {% if turmas %}
+
+    {% if turma_flash_ok %}
+    <div class="alert alert-success" style="margin-bottom:12px;">✓ {{ turma_flash_ok }}</div>
+    {% endif %}
+    {% if turma_flash_error %}
+    <div class="alert" style="margin-bottom:12px;background:#FADBD8;color:#A93226;">✕ {{ turma_flash_error }}</div>
+    {% endif %}
+
+    {% if is_teacher %}
+    <p class="font-sm text-gray" style="margin:0 0 12px;">
+      Crie a turma aqui no Dashboard. Depois, em <strong>+ Novo aluno</strong>, escolha a turma e o livro/nível de cada aluno.
+    </p>
+    <form method="post" action="{{ url_for('turma_create') }}" style="padding:14px;background:#F4F2F8;border-radius:8px;margin-bottom:16px;">
+      <div class="form-grid form-grid-2" style="gap:12px;">
+        <div class="form-group" style="grid-column:1/-1;">
+          <label>Nome da turma *</label>
+          <input type="text" name="turma_display" required placeholder="ex: Turma Kids manhã">
+        </div>
+        <div class="form-group">
+          <label>1º dia da semana *</label>
+          <select name="class_weekday_1" required>
+            <option value="">— Selecione —</option>
+            {% for d in weekday_choices %}
+            <option value="{{ d }}">{{ d }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label>2º dia da semana *</label>
+          <select name="class_weekday_2" required>
+            <option value="">— Selecione —</option>
+            {% for d in weekday_choices %}
+            <option value="{{ d }}">{{ d }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Horário *</label>
+          <input type="time" name="turma_time" class="input-datetime" step="900" required aria-label="Horário da turma">
+        </div>
+      </div>
+      <button type="submit" class="btn btn-primary" style="margin-top:12px;">+ Criar turma</button>
+    </form>
+    {% if teacher_classes %}
+    <div style="display:flex; flex-direction:column; gap:8px;">
+      {% for c in teacher_classes %}
+      <div style="display:flex; align-items:center; justify-content:space-between; padding: 8px 12px; background:#F4F2F8; border-radius:7px;">
+        <div>
+          <span style="font-weight:900; font-size:13px;">{{ c.turma_display }}</span>
+          {% if c.horario %}<span class="font-sm text-gray" style="margin-left:8px;">{{ c.horario }}</span>{% elif c.needs_schedule %}<span class="font-sm text-gray" style="margin-left:8px;">— complete dias/horário</span>{% endif %}
+        </div>
+        <div class="flex gap-8">
+          <a href="{{ url_for('student_new') }}?turma={{ c.turma }}" class="btn btn-ghost btn-xs">+ Aluno</a>
+          <a href="{{ url_for('students') }}?turma={{ c.turma }}" class="btn btn-ghost btn-xs">Alunos</a>
+          <a href="{{ url_for('lessons') }}?turma={{ c.turma }}" class="btn btn-ghost btn-xs">Aulas</a>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="text-gray font-sm">Nenhuma turma criada ainda. Use o formulário acima para criar a primeira.</p>
+    {% endif %}
+
+    {% elif turmas %}
     <div style="display:flex; flex-direction:column; gap:8px;">
       {% for t in turmas %}
       <div style="display:flex; align-items:center; justify-content:space-between; padding: 8px 12px; background:#F4F2F8; border-radius:7px;">

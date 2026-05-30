@@ -3,16 +3,19 @@
 {% block page_title %}Alunos{% endblock %}
 
 {% block topbar_actions %}
+  {% if current_user and current_user.role == 'teacher' %}
+  <a href="{{ url_for('dashboard') }}#criar-turma" class="btn btn-outline">+ Nova turma</a>
+  {% endif %}
   <a href="{{ url_for('student_new') }}" class="btn btn-primary">+ Novo aluno</a>
 {% endblock %}
 
 {% block content %}
 
-{% if turmas %}
+{% if turma_filters %}
 <div class="filter-scroll mb-16" id="turma-filter">
   <button class="btn btn-sm btn-primary filter-btn" data-turma="">Todos</button>
-  {% for t in turmas %}
-  <button class="btn btn-sm btn-ghost filter-btn" data-turma="{{ t }}">{{ t }}</button>
+  {% for f in turma_filters %}
+  <button class="btn btn-sm btn-ghost filter-btn" data-turma="{{ f.code }}">{{ f.label }}</button>
   {% endfor %}
 </div>
 {% endif %}
@@ -26,7 +29,7 @@
         <strong style="font-size:15px;">{{ s.student_name }}</strong>
         <div class="font-sm text-gray" style="margin-top:4px;">{{ s.nivel or '—' }}</div>
       </div>
-      <span class="tag">{{ s.turma }}</span>
+      <span class="tag">{{ turma_labels.get(s.turma, s.turma) }}</span>
     </div>
     <div class="student-card-scores">
       <div class="student-card-score"><span class="font-sm text-gray">Fala</span><strong>{{ s.speaking or '—' }}</strong></div>
@@ -57,7 +60,7 @@
         <th>#</th>
         <th>Nome</th>
         <th>Turma</th>
-        <th>Nível</th>
+        <th>Livro / nível</th>
         <th>Fala</th>
         <th>Audio</th>
         <th>Escrita</th>
@@ -73,7 +76,7 @@
       <tr class="student-row" data-turma="{{ s.turma }}">
         <td class="text-gray font-sm">{{ loop.index }}</td>
         <td><strong>{{ s.student_name }}</strong></td>
-        <td><span class="tag">{{ s.turma }}</span></td>
+        <td><span class="tag">{{ turma_labels.get(s.turma, s.turma) }}</span></td>
         <td class="text-gray font-sm">{{ s.nivel or '—' }}</td>
         <td><div style="width:26px;height:26px;border-radius:50%;background:#5B2D8E;color:#fff;font-size:12px;font-weight:900;display:flex;align-items:center;justify-content:center;">{{ s.speaking or '—' }}</div></td>
         <td><div style="width:26px;height:26px;border-radius:50%;background:#5B2D8E;color:#fff;font-size:12px;font-weight:900;display:flex;align-items:center;justify-content:center;">{{ s.listening or '—' }}</div></td>
