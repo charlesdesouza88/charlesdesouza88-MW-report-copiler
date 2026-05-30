@@ -14,8 +14,9 @@ from pathlib import Path
 from flask import (Flask, abort, redirect, render_template, request,
                    send_file, session, url_for)
 
-from compiler import (create_report_environment, generate_class_diagnostics,
-                      generate_individual_reports, group_by_turma, load_csv)
+from compiler import (build_student_ctx, create_report_environment,
+                      generate_class_diagnostics, generate_individual_reports,
+                      group_by_turma, load_csv)
 
 from auth import (ROLE_ADMIN, ROLE_LABELS, ROLE_SUPERADMIN, ROLE_TEACHER,
                   UserStore, can_manage_teachers, filter_extra_sessions_for_user,
@@ -30,6 +31,11 @@ from extra_sessions import (EXTRA_SESSION_FIELD_LABELS, EXTRA_SESSION_FIELDS,
                             display_status, is_status_ok, parse_import_csv,
                             row_from_form)
 from form_ui import date_from_form, storage_date_to_iso, storage_time_to_input
+from report_periods import (available_report_months, compute_month_trend,
+                            default_report_month, filter_report_files_by_month,
+                            individual_report_filename, load_snapshots,
+                            month_label, report_month_from_filename,
+                            student_composite_score, upsert_month_snapshots)
 
 try:
     from db_store import DatabaseStore
@@ -160,6 +166,7 @@ DATA_DIR = _ensure_writable_dir(
     os.environ.get('DATA_DIR', default_data_dir), '/tmp/mw/data')
 OUT_DIR = _ensure_writable_dir(
     os.environ.get('OUT_DIR', default_out_dir), '/tmp/mw/output')
+SNAPSHOTS_PATH = DATA_DIR / 'student_snapshots.json'
 
 app = Flask(__name__, template_folder='web_templates')
 SECRET_KEY = os.environ.get('SECRET_KEY')
@@ -183,6 +190,8 @@ app.jinja_env.globals.update(
     storage_time_to_input=storage_time_to_input,
     is_status_ok=is_status_ok,
     display_status=display_status,
+    month_label=month_label,
+    report_month_from_filename=report_month_from_filename,
 )
 ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', '')
 SUPERADMIN_EMAIL = os.environ.get('SUPERADMIN_EMAIL', 'admin@misterwiz.local').strip()
@@ -956,6 +965,8 @@ def dashboard():
         turmas=list(turmas.keys()),
         data_ready=data_ready,
         db_status=db_status,
+        available_months=available_report_months(lessons),
+        default_month=default_report_month(lessons),
     )
 
 
@@ -1442,20 +1453,42 @@ def download_csv(name):
 
 # ── Generate & Reports ────────────────────────────────────────────────────────────────
 
+def _report_month_from_request(lessons):
+    raw = (request.form.get('report_month') or request.args.get('month') or '').strip()
+    if raw and raw in available_report_months(lessons):
+        return raw
+    return default_report_month(lessons)
+
+
+def _run_report_generation(students, lessons, report_month):
+    snapshots = load_snapshots(SNAPSHOTS_PATH)
+    env = create_report_environment(TMPL_DIR)
+    generate_individual_reports(
+        students, lessons, env, OUT_DIR,
+        report_month=report_month, snapshots=snapshots,
+    )
+    generate_class_diagnostics(
+        students, lessons, env, OUT_DIR,
+        report_month=report_month, snapshots=snapshots,
+    )
+    upsert_month_snapshots(
+        SNAPSHOTS_PATH, report_month, students, lessons, build_student_ctx,
+    )
+
+
 @app.route('/generate', methods=['POST'])
 @login_required
 def generate():
     all_students, students = _scoped_students()
     _, lessons = _scoped_lessons(all_students)
     user = _current_user()
+    report_month = _report_month_from_request(lessons)
 
     if db_store:
         if not students or not lessons:
             return redirect(url_for('upload' if has_full_data_access(user['role']) else 'dashboard'))
-        env = create_report_environment(TMPL_DIR)
-        generate_individual_reports(students, lessons, env, OUT_DIR)
-        generate_class_diagnostics(students, lessons, env, OUT_DIR)
-        return redirect(url_for('reports'))
+        _run_report_generation(students, lessons, report_month)
+        return redirect(url_for('reports', month=report_month))
 
     if has_full_data_access(user['role']):
         students_file = DATA_DIR / 'students.csv'
@@ -1485,10 +1518,8 @@ def generate():
                 **_upload_page_context(user, errors=errors),
             )
 
-    env = create_report_environment(TMPL_DIR)
-    generate_individual_reports(students, lessons, env, OUT_DIR)
-    generate_class_diagnostics(students, lessons, env, OUT_DIR)
-    return redirect(url_for('reports'))
+    _run_report_generation(students, lessons, report_month)
+    return redirect(url_for('reports', month=report_month))
 
 
 @app.route('/admin/teachers', methods=['GET', 'POST'])
@@ -1552,11 +1583,46 @@ def manage_teachers():
 @app.route('/reports')
 @login_required
 def reports():
-    all_students, _ = _scoped_students()
+    all_students, students = _scoped_students()
+    _, lessons = _scoped_lessons(all_students)
+    selected_month = (request.args.get('month') or '').strip()
+    available_months = available_report_months(lessons)
+    if selected_month and selected_month not in available_months:
+        selected_month = ''
+
     files = filter_reports_for_user(sorted(OUT_DIR.glob('*.html')), all_students, _current_user())
+    files = filter_report_files_by_month(files, selected_month)
     individual = [f for f in files if 'class_diagnostic' not in f.name]
     diagnostics = [f for f in files if 'class_diagnostic' in f.name]
-    return render_template('reports.html', individual=individual, diagnostics=diagnostics)
+
+    snapshots = load_snapshots(SNAPSHOTS_PATH)
+    individual_rows = []
+    for path in individual:
+        month = report_month_from_filename(path.name) or selected_month
+        trend = None
+        for student in students:
+            turma = student.get('turma', '').strip()
+            name = student.get('student_name', '').strip()
+            if not turma or not name:
+                continue
+            if individual_report_filename(turma, name, month) != path.name:
+                if individual_report_filename(turma, name) != path.name:
+                    continue
+            if month:
+                ctx = build_student_ctx(student, lessons, report_month=month)
+                composite = student_composite_score(ctx)
+                trend = compute_month_trend(composite, month, snapshots, turma, name)
+            break
+        individual_rows.append(dict(path=path, trend=trend, report_month=month))
+
+    return render_template(
+        'reports.html',
+        individual=individual_rows,
+        diagnostics=diagnostics,
+        available_months=available_months,
+        selected_month=selected_month,
+        default_month=default_report_month(lessons),
+    )
 
 
 def _allowed_report_path(filename):
@@ -1590,7 +1656,13 @@ def download_report(filename):
 @login_required
 def download_all():
     all_students, _ = _scoped_students()
+    _, lessons = _scoped_lessons(all_students)
+    selected_month = (request.args.get('month') or '').strip()
+    available_months = available_report_months(lessons)
+    if selected_month and selected_month not in available_months:
+        selected_month = ''
     files = filter_reports_for_user(sorted(OUT_DIR.glob('*.html')), all_students, _current_user())
+    files = filter_report_files_by_month(files, selected_month)
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as zf:
         for f in files:

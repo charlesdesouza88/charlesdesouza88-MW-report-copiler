@@ -14,15 +14,19 @@ def safe_report_filename_part(value, fallback):
     return cleaned or fallback
 
 
-def student_report_filename(turma, student_name):
-    return (
-        f'{safe_report_filename_part(turma, "turma")}_'
-        f'{safe_report_filename_part(student_name, "student")}_report.html'
-    )
+def student_report_filename(turma, student_name, report_month=None):
+    safe_turma = safe_report_filename_part(turma, 'turma')
+    safe_name = safe_report_filename_part(student_name, 'student')
+    if report_month:
+        return f'{safe_turma}_{safe_name}_{report_month}_report.html'
+    return f'{safe_turma}_{safe_name}_report.html'
 
 
-def class_diagnostic_filename(turma):
-    return f'{safe_report_filename_part(turma, "turma")}_class_diagnostic.html'
+def class_diagnostic_filename(turma, report_month=None):
+    safe_turma = safe_report_filename_part(turma, 'turma')
+    if report_month:
+        return f'{safe_turma}_{report_month}_class_diagnostic.html'
+    return f'{safe_turma}_class_diagnostic.html'
 
 
 def safe_child_path(directory, filename):

@@ -121,6 +121,11 @@ def report_belongs_to_turmas(filename, turmas):
             continue
         if name == class_diagnostic_filename(turma):
             return True
+        from report_periods import report_month_from_filename
+
+        file_month = report_month_from_filename(name)
+        if file_month and name == class_diagnostic_filename(turma, file_month):
+            return True
     return False
 
 
@@ -138,7 +143,14 @@ def report_belongs_to_teacher(filename, students, teacher_name):
             continue
         turma = student.get('turma', '').strip()
         student_name = student.get('student_name', '').strip()
-        if turma and student_name and student_report_filename(turma, student_name) == name:
+        if not turma or not student_name:
+            continue
+        if student_report_filename(turma, student_name) == name:
+            return True
+        from report_periods import report_month_from_filename
+
+        file_month = report_month_from_filename(name)
+        if file_month and student_report_filename(turma, student_name, file_month) == name:
             return True
     return False
 

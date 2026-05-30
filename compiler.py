@@ -161,12 +161,16 @@ def missed_lessons(student, all_lessons):
     ]
 
 
-def lessons_for(turma, all_lessons):
-    return [
+def lessons_for(turma, all_lessons, report_month=None):
+    rows = [
         lesson
         for lesson in all_lessons
         if lesson["turma"] == turma and lesson["aula_num"].strip()
     ]
+    if not report_month:
+        return rows
+    from report_periods import lesson_in_month
+    return [lesson for lesson in rows if lesson_in_month(lesson, report_month)]
 
 
 def needs_extra(student):
@@ -183,17 +187,24 @@ def group_by_turma(students):
 
 # ── Report builders ───────────────────────────────────────────────────────────
 
-def build_student_ctx(s, all_lessons):
-    turma_lessons = lessons_for(s["turma"], all_lessons)
+def build_student_ctx(s, all_lessons, report_month=None, trend=None):
+    from report_periods import month_label
+
+    turma_lessons = lessons_for(s["turma"], all_lessons, report_month=report_month)
     total = len(turma_lessons)
-    try:
-        faltas = max(0, int(float(s.get("faltas") or 0)))
-    except (TypeError, ValueError):
-        faltas = 0
+    missed = missed_lessons(s, all_lessons)
+    if report_month:
+        from report_periods import lesson_in_month
+        missed = [m for m in missed if lesson_in_month(m, report_month)]
+        faltas = len(missed)
+    else:
+        try:
+            faltas = max(0, int(float(s.get("faltas") or 0)))
+        except (TypeError, ValueError):
+            faltas = 0
 
     pct = presence_pct(faltas, total)
     pie_d, full_circle = pie_path(pct)
-    missed = missed_lessons(s, all_lessons)
     pres_score = pres_to_score(pct)
     needs_makeup = (s.get("aula_extra", "").strip().lower() in ("reposição", "reposicao"))
 
@@ -226,6 +237,9 @@ def build_student_ctx(s, all_lessons):
 
     return dict(
         student=s,
+        report_month=report_month,
+        report_month_label=month_label(report_month) if report_month else '',
+        trend=trend,
         pct=pct,
         pie_d=pie_d,
         full_circle=full_circle,
@@ -246,13 +260,24 @@ def build_student_ctx(s, all_lessons):
     )
 
 
-def build_class_ctx(turma, students, all_lessons):
-    turma_lessons = lessons_for(turma, all_lessons)
+def build_class_ctx(turma, students, all_lessons, report_month=None, snapshots=None):
+    from report_periods import compute_month_trend, month_label, student_composite_score
+
+    turma_lessons = lessons_for(turma, all_lessons, report_month=report_month)
     info = students[0]
+    snapshots = snapshots or {}
 
     student_data = []
     for s in students:
-        ctx = build_student_ctx(s, all_lessons)
+        trend = None
+        if report_month:
+            ctx_for_score = build_student_ctx(s, all_lessons, report_month=report_month)
+            composite = student_composite_score(ctx_for_score)
+            trend = compute_month_trend(
+                composite, report_month, snapshots,
+                s.get('turma', ''), s.get('student_name', ''),
+            )
+        ctx = build_student_ctx(s, all_lessons, report_month=report_month, trend=trend)
         student_data.append(ctx)
 
     return dict(
@@ -261,6 +286,8 @@ def build_class_ctx(turma, students, all_lessons):
         nivel=info.get("nivel", ""),
         horario=info.get("horario", ""),
         teacher=info.get("teacher", ""),
+        report_month=report_month,
+        report_month_label=month_label(report_month) if report_month else '',
         lessons=turma_lessons,
         students=student_data,
         grid=pentagon_grid(),
@@ -277,22 +304,35 @@ def create_report_environment(template_dir):
     )
 
 
-def generate_individual_reports(students, lessons, env, out_dir):
+def generate_individual_reports(students, lessons, env, out_dir, report_month=None, snapshots=None):
+    from report_periods import compute_month_trend, month_label, student_composite_score
     tpl = env.get_template("individual_report.html")
+    snapshots = snapshots or {}
     for s in students:
-        ctx = build_student_ctx(s, lessons)
+        trend = None
+        if report_month:
+            base_ctx = build_student_ctx(s, lessons, report_month=report_month)
+            composite = student_composite_score(base_ctx)
+            trend = compute_month_trend(
+                composite, report_month, snapshots,
+                s.get('turma', ''), s.get('student_name', ''),
+            )
+        ctx = build_student_ctx(s, lessons, report_month=report_month, trend=trend)
+        if report_month:
+            ctx['report_month_label'] = month_label(report_month)
         html = tpl.render(**ctx)
-        fname = student_report_filename(s["turma"], s["student_name"])
+        fname = student_report_filename(s['turma'], s['student_name'], report_month)
         safe_child_path(out_dir, fname).write_text(html, encoding="utf-8")
         print(f"  ✓ {fname}")
 
 
-def generate_class_diagnostics(students, lessons, env, out_dir):
+def generate_class_diagnostics(students, lessons, env, out_dir, report_month=None, snapshots=None):
     tpl = env.get_template("class_diagnostic.html")
+    snapshots = snapshots or {}
     for turma, group in group_by_turma(students).items():
-        ctx = build_class_ctx(turma, group, lessons)
+        ctx = build_class_ctx(turma, group, lessons, report_month=report_month, snapshots=snapshots)
         html = tpl.render(**ctx)
-        fname = class_diagnostic_filename(turma)
+        fname = class_diagnostic_filename(turma, report_month)
         safe_child_path(out_dir, fname).write_text(html, encoding="utf-8")
         print(f"  ✓ {fname}")
 

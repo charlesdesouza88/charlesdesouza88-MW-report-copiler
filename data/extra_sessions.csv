@@ -1,0 +1,41 @@
+teacher,student_name,turma,date,horario,turno,session_type,assuntos,observacao,contatado,marcado,realizado
+Amanda,Lais Machado Castro Neves (Comet - A),Comet - A,13/05,09:30,Manhã,Reforço,Reforço -,FALTOU,OK,OK,NÃO
+Amanda,Luma Chaves Rodrigues Lima (Comet - A),Comet - A,04/05,09:30,Manhã,Reforço,Reforço -,,OK,OK,OK
+Amanda,Luma Chaves Rodrigues Lima (Comet - A),Comet - A,11/05,09:30,Manhã,Reforço,Reforço -,,OK,OK,OK
+Amanda,Luma Chaves Rodrigues Lima (Comet - A),Comet - A,25/05,09:30,Manhã,Reforço,Reforco -,,OK,OK,
+Amanda,Luana Trindade Ribeiro (Star - B),Star - B,29/04,10:00,Manhã,Reforço,Reforço -,FALTOU,OK,OK,NÃO
+Amanda,Luana Trindade Ribeiro (Star - B),Star - B,11/05,10:15,,Reforço,Reforço -,FALTOU,OK,OK,NÃO
+Amanda,Luana Trindade Ribeiro (Star - B),Star - B,25/05,10:15,Manhã,Reforço,Reforço -,,OK,,
+Amanda,Lara Rocha Freitas (Star - B),Star - B,27/04,09:30,Manhã,Reposição,Reforço - Reposição ate a lição 12,Feito até a lição 4,OK,OK,OK
+Amanda,Lara Rocha Freitas (Star - B),Star - B,13/05,10:15,,Reforço,,,OK,OK,
+Amanda,Lara Rocha Freitas (Star - B),Star - B,18/05,09:30,,Reforço,,,OK,OK,
+Amanda,Caio Franco Cimini (Star - B),Star - B,27/04,09:30,Manhã,Reposição,Reforço - Reposição ate a lição 12,Feito até a lição 4,OK,OK,OK
+Amanda,Caio Franco Cimini (Star - B),Star - B,13/05,10:15,,Reforço,,,OK,OK,
+Amanda,Caio Franco Cimini (Star - B),Star - B,18/05,09:30,,Reforço,,,OK,OK,
+Amanda,Miguel Paiva Pacheco (Spark - C),Spark - C,08/05,08:00,Manhã,Reforço,Reforço -,cancelado 07/05 ás 14:43,OK,OK,
+Amanda,Mateus Batista Lauar Breder (Spark - C),Spark - C,,,Manhã,Reforço,Reforço -,,OK,,
+Amanda,Maria Fernanda Carvalho Pires (Comet - A),Comet - A,24/04,10:00,Manhã,Reforço,Reforço - Adverbs of frequency and daily routine sentences,,OK,OK,OK
+Bárbara,Ana Flávia D Castro Breder (Cloud - B),Cloud - B,,,Tarde,Reforço,Reforço -,,OK,,
+Bárbara,Laura Machado Castro Neves (Cloud - B),Cloud - B,08/05,14:30,Tarde,Reforço,"Reforço - Vocabulary, listening and writing","1h de aula, lições 31 e 32",OK,OK,OK
+Bárbara,Ricardo Demoner Rossoni  (Cloud - B),Cloud - B,04/05,15:30,Tarde,Reforço,Reforço - Listening até a lição 5 - completos,Pouquissimos erros de escrita - bom desempenho,OK,OK,OK
+Bárbara,Kaio Cézar Oliveira Vieira (Power - C),Power - C,,,Tarde,Reforço,Reforço -,,,,
+Bárbara,Vitor Oliveira Sanches (Power - C),Power - C,25/05,15:30,Tarde,Reforço,Reforço -,,OK,OK,
+Bárbara,Davi Bertran Vieira Ernesto (Impact - J),Impact - J,26/05,13:30,Tarde,Reforço,Reforço -,,OK,OK,
+Bárbara,Alice Correa de Paula (Prize - C),Prize - C,,,Tarde,Reforço,Reforço -,,,,
+Bárbara,Sofia Miranda dos Reis Martins,,06/05,15:30,Tarde,Reforço,Reforço -,cancelado ás 15:16 05/05,OK,OK,
+Bárbara,Allice Garcia Guimarães (Proud - H),Proud - H,27/05,15:30,Tarde,Reforço,Reforço -,,OK,OK,
+Chuck,Daniel D Castro Breder  (Prize - C),Prize - C,04/05,15:30,Tarde,Reforço,"Reforço - Verbos, conjugação, pronuncia (student tools kit)",,OK,OK,OK
+Chuck,Daniel D Castro Breder  (Prize - C),Prize - C,06/05,15:30,Tarde,Reforço,Reforço -,,OK,OK,OK
+,Felipe Garcia Guimarães (Inspire - C),Inspire - C,,,,Reforço,Reforço -,,,,
+,Miguel Machado Barbosa (Inspire - C),Inspire - C,,,,Reforço,Reforço -,,,,
+,Luis Vinicius  (Inspire - C),Inspire - C,,,,Reforço,,,,,
+,Heitor Gonçalves (Comet-A),Comet-A,,,,Reforço,Reforço -,,,,
+Henrique,Davi Bertran Vieira Ernesto (Impact - J),Impact - J,04/05,17:15,Tarde,Reforço,Reforço -,cancelado ás 13:30 04/05,OK,OK,
+,Heitor Gonçalves de Oliveira (Comet - A),Comet - A,,,,Reforço,Reforço -,",",,,
+,Davi Queoperro dos Reis (Sunny - H),Sunny - H,,,,Reforço,Reforço -,,,,
+Henrique,Tereza Maria Salet de Assis Ferraz (Root - H),Root - H,06/05,17:15,Tarde,Reforço,Reforço -,,OK,OK,
+,Evelin Valentina Dias da Silva Caetano (Proud - H),Proud - H,,,,Reforço,Reforço -,,,,
+,Rafaela Teixeira de Souza Oliveira (Proud - H),Proud - H,,,,Reforço,Reforço -,,,,
+,Ana Julia Vieira Santos (Ignite - H),Ignite - H,,,,Reforço,Reforço -,,,,
+,Arthur Cupertino Gomes Alvagenra (Impact - J),Impact - J,,,,Reforço,Reforço -,,,,
+,Vitória - Power,,,,,Reforço,,,,,

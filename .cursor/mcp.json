@@ -1,7 +1,3 @@
 {
-  "mcpServers": {
-    "railway": {
-      "url": "https://mcp.railway.com"
-    }
-  }
+  "mcpServers": {}
 }
