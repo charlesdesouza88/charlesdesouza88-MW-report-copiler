@@ -85,7 +85,10 @@ class DatabaseStore:
         )
         engine_kwargs = {"pool_pre_ping": True}
         if prepared.startswith("postgresql"):
-            engine_kwargs["connect_args"] = {"sslmode": "require"}
+            engine_kwargs["connect_args"] = {
+                "sslmode": "require",
+                "connect_timeout": 5,
+            }
         self.engine = create_engine(prepared, **engine_kwargs)
         self.session_factory = sessionmaker(bind=self.engine, expire_on_commit=False)
 

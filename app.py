@@ -7,6 +7,7 @@ import io
 import json
 import logging
 import os
+import threading
 import time
 import zipfile
 from pathlib import Path
@@ -96,28 +97,53 @@ if not DATABASE_URL:
 DB_ENABLED = bool(DATABASE_URL) and DatabaseStore is not None
 db_store = None
 DB_STARTUP_ERROR = None
-if DB_ENABLED:
-    last_exc = None
-    for attempt in range(1, 4):
-        try:
-            db_store = DatabaseStore(DATABASE_URL)
-            db_store.initialize()
-            last_exc = None
-            logger.info('Database connected on attempt %s', attempt)
-            break
-        except Exception as exc:
-            last_exc = exc
-            logger.warning('Database startup attempt %s failed: %s', attempt, exc)
-            if attempt < 3:
-                time.sleep(2)
-    if last_exc is not None:
-        logger.exception('Database startup failed; falling back to CSV mode')
-        db_store = None
-        DB_ENABLED = False
-        DB_STARTUP_ERROR = str(last_exc)
-elif DATABASE_URL and DB_IMPORT_ERROR is not None:
+_services_lock = threading.Lock()
+_services_ready = False
+
+if DATABASE_URL and DB_IMPORT_ERROR is not None:
     logger.error('DATABASE_URL is set but database dependencies failed to import: %s', DB_IMPORT_ERROR)
     DB_STARTUP_ERROR = f'Database dependencies failed to import: {DB_IMPORT_ERROR}'
+
+
+def _init_application_services():
+    """Connect DB and bootstrap users after the app process is listening (Railway healthcheck)."""
+    global db_store, DB_ENABLED, DB_STARTUP_ERROR, _services_ready
+
+    if _services_ready:
+        return
+
+    with _services_lock:
+        if _services_ready:
+            return
+
+        if DB_ENABLED:
+            last_exc = None
+            for attempt in range(1, 4):
+                try:
+                    db_store = DatabaseStore(DATABASE_URL)
+                    db_store.initialize()
+                    last_exc = None
+                    logger.info('Database connected on attempt %s', attempt)
+                    break
+                except Exception as exc:
+                    last_exc = exc
+                    logger.warning('Database startup attempt %s failed: %s', attempt, exc)
+                    if attempt < 3:
+                        time.sleep(2)
+            if last_exc is not None:
+                logger.exception('Database startup failed; falling back to CSV mode')
+                db_store = None
+                DB_ENABLED = False
+                DB_STARTUP_ERROR = str(last_exc)
+
+        user_store.db_store = db_store
+        try:
+            user_store.initialize()
+            _bootstrap_auth_accounts()
+        except Exception as exc:
+            logger.exception('User store initialization failed: %s', exc)
+
+        _services_ready = True
 
 
 def _database_status():
@@ -210,14 +236,9 @@ def _bootstrap_auth_accounts():
 
 
 user_store = UserStore(
-    db_store=db_store,
+    db_store=None,
     json_path=DATA_DIR / 'users.json',
 )
-try:
-    user_store.initialize()
-    _bootstrap_auth_accounts()
-except Exception as exc:
-    logger.exception('User store initialization failed: %s', exc)
 
 STUDENT_FIELDS = [
     'teacher', 'turma', 'turma_display', 'nivel', 'horario', 'student_name',
@@ -874,6 +895,13 @@ def _delete_csv_dataset(name, user):
 
 # ── Auth ─────────────────────────────────────────────────────────────────────────────
 
+@app.before_request
+def _ensure_services_before_request():
+    if request.endpoint == 'health':
+        return
+    _init_application_services()
+
+
 @app.route('/health')
 def health():
     """Railway healthcheck — no auth, always 200 when the app is up."""
@@ -883,6 +911,7 @@ def health():
 @app.route('/health/db')
 def health_db():
     """Database connectivity check (JSON). No auth — for Railway / ops."""
+    _init_application_services()
     status = _database_status()
     code = 200 if status.get('connected') or not status.get('configured') else 503
     return json.dumps(status, ensure_ascii=False), code, {'Content-Type': 'application/json'}
