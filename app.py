@@ -1484,6 +1484,28 @@ def _report_month_from_request(lessons):
     return default_report_month(lessons)
 
 
+def _validate_generation_inputs(students, lessons):
+    """Return a user-facing error message, or None when generation can proceed."""
+    if not students:
+        return 'Nenhum aluno encontrado para o seu perfil. Cadastre alunos antes de gerar relatórios.'
+    if not lessons:
+        return (
+            'Nenhuma aula encontrada para as turmas selecionadas. '
+            'Cadastre o CSV de aulas (ou confira se as turmas dos alunos batem com as aulas).'
+        )
+    missing = []
+    for idx, student in enumerate(students, start=1):
+        if not (student.get('turma') or '').strip():
+            missing.append(f'linha {idx}: turma em branco')
+        if not (student.get('student_name') or '').strip():
+            missing.append(f'linha {idx}: nome do aluno em branco')
+        if len(missing) >= 3:
+            break
+    if missing:
+        return 'Dados de alunos incompletos: ' + '; '.join(missing) + '.'
+    return None
+
+
 def _run_report_generation(students, lessons, report_month):
     snapshots = load_snapshots(SNAPSHOTS_PATH)
     env = create_report_environment(TMPL_DIR)
@@ -1528,10 +1550,7 @@ def generate():
     user = _current_user()
     report_month = _report_month_from_request(lessons)
 
-    if db_store:
-        if not students or not lessons:
-            return redirect(url_for('upload' if has_full_data_access(user['role']) else 'dashboard'))
-    elif has_full_data_access(user['role']):
+    if has_full_data_access(user['role']) and not db_store:
         students_file = DATA_DIR / 'students.csv'
         lessons_file = DATA_DIR / 'lessons.csv'
         missing = []
@@ -1558,6 +1577,11 @@ def generate():
                 'upload.html',
                 **_upload_page_context(user, errors=errors),
             )
+
+    input_error = _validate_generation_inputs(students, lessons)
+    if input_error:
+        session['generate_error'] = input_error
+        return redirect(url_for('dashboard'))
 
     try:
         _run_report_generation(students, lessons, report_month)
@@ -1655,16 +1679,23 @@ def reports():
         if trend:
             report_trends[path.name] = trend
 
-    return render_template(
-        'reports.html',
-        individual=individual,
-        report_trends=report_trends,
-        report_months=report_months,
-        diagnostics=diagnostics,
-        available_months=available_months,
-        selected_month=selected_month,
-        default_month=default_report_month(lessons),
-    )
+    try:
+        return render_template(
+            'reports.html',
+            individual=individual,
+            report_trends=report_trends,
+            report_months=report_months,
+            diagnostics=diagnostics,
+            available_months=available_months,
+            selected_month=selected_month,
+            default_month=default_report_month(lessons),
+        )
+    except Exception as exc:
+        logger.exception('Reports page failed: %s', exc)
+        session['generate_error'] = (
+            'Não foi possível abrir a lista de relatórios. Tente gerar novamente.'
+        )
+        return redirect(url_for('dashboard'))
 
 
 def _allowed_report_path(filename):

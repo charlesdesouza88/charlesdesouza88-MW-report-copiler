@@ -68,8 +68,8 @@
     </thead>
     <tbody>
       {% for f in individual %}
-      {% set trend = report_trends.get(f.name) %}
-      {% set file_month = report_months.get(f.name) %}
+      {% set trend = (report_trends|default({})).get(f.name) %}
+      {% set file_month = (report_months|default({})).get(f.name) %}
       <tr>
         <td><strong>{{ f.stem.replace('_', ' ') }}</strong></td>
         <td>

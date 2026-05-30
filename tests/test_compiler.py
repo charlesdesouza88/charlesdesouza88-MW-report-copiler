@@ -129,6 +129,24 @@ def test_needs_extra_accepts_accented_and_unaccented_values():
     assert needs_extra(_student(aula_extra="")) is False
 
 
+def test_build_student_ctx_requires_turma():
+    try:
+        build_student_ctx(_student(turma=""), _lessons())
+        assert False, "expected ValueError"
+    except ValueError:
+        pass
+
+
+def test_group_by_turma_skips_rows_without_turma():
+    groups = group_by_turma([
+        _student(student_name="A", turma="MASTER"),
+        _student(student_name="B", turma=""),
+        {"student_name": "C"},
+    ])
+    assert list(groups.keys()) == ["MASTER"]
+    assert len(groups["MASTER"]) == 1
+
+
 def test_group_by_turma_groups_students():
     groups = group_by_turma([
         _student(student_name="A", turma="MASTER"),

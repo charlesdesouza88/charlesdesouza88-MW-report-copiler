@@ -152,12 +152,14 @@ def missed_lessons(student, all_lessons):
     raw = student.get("missed_aulas", "").strip()
     if not raw:
         return []
+    turma = (student.get("turma") or "").strip()
+    if not turma:
+        return []
     nums = {n.strip() for n in raw.split(",") if n.strip()}
-    turma = student["turma"]
     return [
         lesson
         for lesson in all_lessons
-        if lesson["turma"] == turma and lesson["aula_num"].strip() in nums
+        if lesson.get("turma") == turma and lesson.get("aula_num", "").strip() in nums
     ]
 
 
@@ -181,7 +183,10 @@ def needs_extra(student):
 def group_by_turma(students):
     groups = {}
     for s in students:
-        groups.setdefault(s["turma"], []).append(s)
+        turma = (s.get("turma") or "").strip()
+        if not turma:
+            continue
+        groups.setdefault(turma, []).append(s)
     return groups
 
 
@@ -190,7 +195,10 @@ def group_by_turma(students):
 def build_student_ctx(s, all_lessons, report_month=None, trend=None):
     from report_periods import month_label
 
-    turma_lessons = lessons_for(s["turma"], all_lessons, report_month=report_month)
+    turma = (s.get("turma") or "").strip()
+    if not turma:
+        raise ValueError('Student row is missing turma')
+    turma_lessons = lessons_for(turma, all_lessons, report_month=report_month)
     total = len(turma_lessons)
     missed = missed_lessons(s, all_lessons)
     if report_month:
