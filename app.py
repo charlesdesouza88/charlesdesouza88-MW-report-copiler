@@ -203,6 +203,7 @@ PRODUCTION_ENV = (
     or os.environ.get('RAILWAY_SERVICE_ID')
 )
 if PRODUCTION_ENV and not SECRET_KEY:
+    logger.critical('SECRET_KEY is not set — set it in Railway service variables.')
     raise RuntimeError('SECRET_KEY must be set in production.')
 app.secret_key = SECRET_KEY or 'mw-dev-change-in-prod'
 app.config.update(
