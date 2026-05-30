@@ -7,6 +7,9 @@
 {% endblock %}
 
 {% block content %}
+{% if form_error %}
+<div class="alert" style="background:#FADBD8; color:#A93226; border:1px solid #F1948A;">✕ &nbsp;{{ form_error }}</div>
+{% endif %}
 <form method="post" style="max-width: 860px;">
 
   <!-- Info básica -->
@@ -27,8 +30,8 @@
         {% endif %}
       </div>
       <div class="form-group">
-        <label>Turma (ID)</label>
-        <input type="text" name="turma" value="{{ student.turma or '' }}" placeholder="ex: MASTER">
+        <label>Turma (ID) *</label>
+        <input type="text" name="turma" value="{{ student.turma or '' }}" placeholder="ex: MASTER" required>
       </div>
       <div class="form-group">
         <label>Turma (nome exibido)</label>

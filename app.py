@@ -665,6 +665,27 @@ def _teacher_may_use_student_turma(turma, all_students, user):
     return turma.strip() in existing_turmas
 
 
+def _student_row_from_form():
+    return {field: (request.form.get(field, '') or '').strip() for field in STUDENT_FIELDS}
+
+
+def _validate_student_row(row, all_students, user):
+    """Return a user-facing error message, or None when the row can be saved."""
+    name = (row.get('student_name') or '').strip()
+    turma = (row.get('turma') or '').strip()
+    if not name or not turma:
+        return 'Informe o nome do aluno e o código da turma (ex: MASTER).'
+    if not _teacher_may_use_student_turma(turma, all_students, user):
+        allowed = sorted(teacher_turmas(all_students, user.get('teacher_name', '')))
+        if allowed:
+            return (
+                f'Você só pode usar turmas já vinculadas ao seu perfil: {", ".join(allowed)}. '
+                'Para uma turma nova, peça ao administrador ou cadastre o primeiro aluno via CSV.'
+            )
+        return 'Turma não permitida para o seu perfil de professor.'
+    return None
+
+
 def _lesson_from_form():
     row = {field: (request.form.get(field) or '').strip() for field in LESSON_FIELDS}
     row['date'] = date_from_form(request.form)
@@ -1032,22 +1053,25 @@ def student_edit(idx):
         abort(404)
     user = _current_user()
     if request.method == 'POST':
-        for field in STUDENT_FIELDS:
-            visible[idx][field] = request.form.get(field, '')
+        updated = _student_row_from_form()
         if user['role'] == ROLE_TEACHER:
-            visible[idx]['teacher'] = user.get('teacher_name') or visible[idx].get('teacher', '')
-        if not visible[idx].get('turma') or not visible[idx].get('student_name'):
-            abort(400)
-        if not _teacher_may_use_student_turma(visible[idx]['turma'], all_rows, user):
-            abort(403)
-        if has_full_data_access(user['role']):
-            _save_students(visible)
-        else:
-            global_idx = find_student_global_index(all_rows, visible, idx)
-            if global_idx is None:
-                abort(404)
-            all_rows[global_idx] = visible[idx]
-            _save_students(all_rows)
+            updated['teacher'] = user.get('teacher_name') or updated.get('teacher', '')
+        form_error = _validate_student_row(updated, all_rows, user)
+        if form_error:
+            return render_template(
+                'student_edit.html',
+                student=updated,
+                idx=idx,
+                score_fields=SCORE_FIELDS,
+                is_new=False,
+                form_error=form_error,
+            )
+        visible[idx] = updated
+        global_idx = find_student_global_index(all_rows, visible, idx)
+        if global_idx is None:
+            abort(404)
+        all_rows[global_idx] = visible[idx]
+        _save_students(all_rows)
         return redirect(url_for('students'))
     return render_template('student_edit.html',
         student=visible[idx], idx=idx, score_fields=SCORE_FIELDS, is_new=False)
@@ -1059,18 +1083,25 @@ def student_new():
     all_rows, visible = _scoped_students()
     user = _current_user()
     if request.method == 'POST':
-        new_row = {f: request.form.get(f, '') for f in STUDENT_FIELDS}
+        new_row = _student_row_from_form()
         if user['role'] == ROLE_TEACHER:
             new_row['teacher'] = user.get('teacher_name') or new_row.get('teacher', '')
-        if not new_row.get('turma') or not new_row.get('student_name'):
-            abort(400)
-        if not _teacher_may_use_student_turma(new_row['turma'], all_rows, user):
-            abort(403)
+        form_error = _validate_student_row(new_row, all_rows, user)
+        if form_error:
+            return render_template(
+                'student_edit.html',
+                student=new_row,
+                idx=None,
+                score_fields=SCORE_FIELDS,
+                is_new=True,
+                form_error=form_error,
+            )
         all_rows.append(new_row)
         _save_students(all_rows)
         return redirect(url_for('students'))
     defaults = dict(visible[0]) if visible else dict(all_rows[0]) if all_rows else {}
     defaults['student_name'] = ''
+    defaults['turma'] = ''
     defaults.setdefault('faltas', '0')
     if user['role'] == ROLE_TEACHER:
         defaults['teacher'] = user.get('teacher_name', '')
@@ -1585,9 +1616,9 @@ def _trend_for_report_file(path, month, students, lessons, snapshots):
     turma, name = _student_for_report_file(path, students, month)
     if not turma or not name:
         return None
-    from report_periods import _snapshot_key
+    from report_periods import _snapshot_key, student_snapshot_id
 
-    snap_key = _snapshot_key(turma, name, month)
+    snap_key = _snapshot_key(turma, student_snapshot_id(turma, name), month)
     row = snapshots.get(snap_key)
     if row and row.get('composite_score') is not None:
         composite = int(row['composite_score'])

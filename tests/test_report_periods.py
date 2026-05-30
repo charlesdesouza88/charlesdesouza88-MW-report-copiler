@@ -12,6 +12,7 @@ from report_periods import (
     parse_lesson_month,
     previous_calendar_month,
     report_month_from_filename,
+    student_snapshot_id,
     upsert_month_snapshots,
 )
 
@@ -55,8 +56,9 @@ def test_individual_report_filename():
 
 
 def test_compute_month_trend():
+    sid = student_snapshot_id('MASTER', 'Jane')
     snapshots = {
-        'MASTER|Jane|2026-02': {'composite_score': 3},
+        f'MASTER|{sid}|2026-02': {'composite_score': 3},
     }
     improved = compute_month_trend(4, '2026-03', snapshots, 'MASTER', 'Jane')
     assert improved['direction'] == 'improved'
@@ -68,7 +70,7 @@ def test_compute_month_trend():
     null_prior = compute_month_trend(
         4,
         '2026-03',
-        {'MASTER|Jane|2026-02': {'composite_score': None}},
+        {f'MASTER|{sid}|2026-02': {'composite_score': None}},
         'MASTER',
         'Jane',
     )
@@ -121,5 +123,8 @@ def test_upsert_month_snapshots(tmp_path):
     ]
     upsert_month_snapshots(path, '2026-03', [student], lessons, build_student_ctx)
     store = load_snapshots(path)
-    assert 'MASTER|Jane|2026-03' in store
-    assert store['MASTER|Jane|2026-03']['composite_score'] >= 1
+    sid = student_snapshot_id('MASTER', 'Jane')
+    assert f'MASTER|{sid}|2026-03' in store
+    assert store[f'MASTER|{sid}|2026-03']['composite_score'] >= 1
+    assert 'student_name' not in store[f'MASTER|{sid}|2026-03']
+    assert store[f'MASTER|{sid}|2026-03']['student_id'] == sid

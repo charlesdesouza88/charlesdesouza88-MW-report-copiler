@@ -1,5 +1,6 @@
 """Reporting periods (months), snapshots, and month-over-month trends."""
 
+import hashlib
 import json
 import re
 from datetime import datetime
@@ -94,13 +95,20 @@ def _as_int_score(value, default=0):
         return default
 
 
+def student_snapshot_id(turma, student_name):
+    """Stable pseudonym for snapshot storage (no PII in student_snapshots.json)."""
+    raw = f'{(turma or "").strip()}|{(student_name or "").strip()}'.casefold()
+    return hashlib.sha256(raw.encode('utf-8')).hexdigest()[:16]
+
+
 def compute_month_trend(current_score, report_month, snapshots, turma, student_name):
     """Compare composite score to the previous calendar month's snapshot."""
     prev_month = previous_calendar_month(report_month)
     if not prev_month:
         return _trend('first', None, current_score)
 
-    key = _snapshot_key(turma, student_name, prev_month)
+    sid = student_snapshot_id(turma, student_name)
+    key = _snapshot_key(turma, sid, prev_month)
     prior = snapshots.get(key)
     if not prior:
         return _trend('first', None, current_score)
@@ -140,8 +148,8 @@ def _trend(direction, delta, current_score, prior_score=None):
     )
 
 
-def _snapshot_key(turma, student_name, month_key):
-    return f'{turma}|{student_name}|{month_key}'
+def _snapshot_key(turma, student_id, month_key):
+    return f'{turma}|{student_id}|{month_key}'
 
 
 def load_snapshots(path):
@@ -157,12 +165,18 @@ def load_snapshots(path):
     for row in raw:
         if not isinstance(row, dict):
             continue
+        if row.get('is_test'):
+            continue
         month = (row.get('report_month') or '').strip()
         turma = (row.get('turma') or '').strip()
-        name = (row.get('student_name') or '').strip()
-        if not month or not turma or not name:
+        sid = (row.get('student_id') or '').strip()
+        if not sid:
+            legacy_name = (row.get('student_name') or '').strip()
+            if legacy_name:
+                sid = student_snapshot_id(turma, legacy_name)
+        if not month or not turma or not sid:
             continue
-        out[_snapshot_key(turma, name, month)] = row
+        out[_snapshot_key(turma, sid, month)] = row
     return out
 
 
@@ -184,10 +198,11 @@ def upsert_month_snapshots(path, report_month, students, lessons, build_ctx):
             continue
         ctx = build_ctx(student, lessons, report_month=report_month)
         composite = student_composite_score(ctx)
-        store[_snapshot_key(turma, name, report_month)] = {
+        sid = student_snapshot_id(turma, name)
+        store[_snapshot_key(turma, sid, report_month)] = {
             'report_month': report_month,
             'turma': turma,
-            'student_name': name,
+            'student_id': sid,
             'composite_score': composite,
             'dev_overall': ctx['dev_overall'],
             'part_overall': ctx['part_overall'],

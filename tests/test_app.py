@@ -152,13 +152,13 @@ def test_reports_page_with_null_prior_snapshot(monkeypatch, tmp_path):
                 {
                     'report_month': '2026-03',
                     'turma': 'MASTER',
-                    'student_name': 'Jane Doe',
+                    'student_id': '6a03573506b6a182',
                     'composite_score': 4,
                 },
                 {
                     'report_month': '2026-02',
                     'turma': 'MASTER',
-                    'student_name': 'Jane Doe',
+                    'student_id': '6a03573506b6a182',
                     'composite_score': None,
                 },
             ],
@@ -468,7 +468,66 @@ def test_teacher_cannot_create_student_in_other_turma(monkeypatch, tmp_path):
         },
     )
 
-    assert response.status_code == 403
+    assert response.status_code == 200
+    assert "turmas já vinculadas" in response.get_data(as_text=True)
+    assert "Mallory" not in (data_dir / "students.csv").read_text(encoding="utf-8")
+
+
+def test_student_new_requires_turma(monkeypatch, tmp_path):
+    data_dir = tmp_path / "data"
+    data_dir.mkdir()
+    (data_dir / "students.csv").write_text(_students_csv(), encoding="utf-8")
+
+    monkeypatch.setattr(web_app, "DATA_DIR", data_dir)
+    monkeypatch.setattr(web_app, "OUT_DIR", tmp_path / "output")
+    web_app.OUT_DIR.mkdir()
+    _init_user_store(monkeypatch, data_dir)
+
+    client = web_app.app.test_client()
+    _login(client)
+    response = client.post(
+        "/students/new",
+        data={"student_name": "No Turma Kid", "teacher": "Chuck", "turma": ""},
+    )
+
+    assert response.status_code == 200
+    assert "código da turma" in response.get_data(as_text=True)
+
+
+def test_student_new_creates_row(monkeypatch, tmp_path):
+    data_dir = tmp_path / "data"
+    data_dir.mkdir()
+    (data_dir / "students.csv").write_text(_students_csv(), encoding="utf-8")
+
+    monkeypatch.setattr(web_app, "DATA_DIR", data_dir)
+    monkeypatch.setattr(web_app, "OUT_DIR", tmp_path / "output")
+    web_app.OUT_DIR.mkdir()
+    _init_user_store(monkeypatch, data_dir)
+
+    client = web_app.app.test_client()
+    _login(client)
+    response = client.post(
+        "/students/new",
+        data={
+            "teacher": "Chuck",
+            "turma": "KIDS",
+            "student_name": "New Kid",
+            "participacao": "3",
+            "comportamento": "3",
+            "speaking": "3",
+            "listening": "3",
+            "foco": "3",
+            "writing": "3",
+            "reading": "3",
+            "gramatica": "3",
+            "faltas": "0",
+        },
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 302
+    assert response.headers["Location"].endswith("/students")
+    assert "New Kid" in (data_dir / "students.csv").read_text(encoding="utf-8")
 
 
 def test_upload_template_lessons_download(monkeypatch, tmp_path):
