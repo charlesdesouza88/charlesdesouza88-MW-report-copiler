@@ -36,6 +36,20 @@ body {
 .student-name { font-size: 28px; font-weight: 900; line-height: 1; }
 .turma-line { color: #5B2D8E; font-size: 12px; font-weight: 700; margin-top: 2px; }
 .turma-line span { color: #111; }
+.period-line { font-size: 11px; font-weight: 700; margin-top: 4px; color: #444; }
+.trend-pill {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 900;
+  vertical-align: middle;
+}
+.trend-improved { background: #E6F4EA; color: #1B7A3D; }
+.trend-declined { background: #FCE8E6; color: #B3261E; }
+.trend-stable { background: #EDE8F4; color: #5B2D8E; }
+.trend-first { background: #F0F0F0; color: #666; }
 .teacher-block { text-align: right; }
 .teacher-label { font-size: 10px; font-weight: 700; color: #5B2D8E; }
 .teacher-name { font-size: 16px; font-weight: 900; color: #5B2D8E; }
@@ -214,6 +228,14 @@ body {
   <div class="header-center">
     <div class="student-name">{{ student.student_name }}</div>
     <div class="turma-line">Turma: <span>{{ student.turma_display or student.turma }}</span> &nbsp;|&nbsp; {{ student.nivel or '' }} &nbsp;|&nbsp; {{ student.horario or '' }}</div>
+    {% if report_month_label %}
+    <div class="period-line">
+      Período: {{ report_month_label }}
+      {% if trend %}
+      <span class="trend-pill trend-{{ trend.direction }}">{{ trend.symbol }} {{ trend.label }}{% if trend.direction != 'first' and trend.delta %} ({% if trend.delta > 0 %}+{% endif %}{{ trend.delta }}){% endif %}</span>
+      {% endif %}
+    </div>
+    {% endif %}
   </div>
   <div class="teacher-block">
     <div class="teacher-label">Teacher</div>

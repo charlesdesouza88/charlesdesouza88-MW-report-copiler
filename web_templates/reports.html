@@ -4,20 +4,51 @@
 
 {% block topbar_actions %}
   {% if individual or diagnostics %}
-  <a href="{{ url_for('download_all') }}" class="btn btn-outline btn-sm">↓ Baixar todos (.zip)</a>
+  <a href="{{ url_for('download_all', month=selected_month) if selected_month else url_for('download_all') }}" class="btn btn-outline btn-sm">↓ Baixar todos (.zip)</a>
   {% endif %}
-  <form method="post" action="{{ url_for('generate') }}" style="display:inline;">
+  <form method="post" action="{{ url_for('generate') }}" style="display:inline-flex; gap:8px; align-items:center;">
+    {% if available_months %}
+    <select name="report_month" class="input-select" style="padding:6px 10px; border-radius:8px; border:1px solid #E2E2E2;">
+      {% for m in available_months %}
+      <option value="{{ m }}" {% if m == (selected_month or default_month) %}selected{% endif %}>{{ month_label(m) }}</option>
+      {% endfor %}
+    </select>
+    {% endif %}
     <button type="submit" class="btn btn-primary btn-sm">▶ Regenerar</button>
   </form>
 {% endblock %}
 
 {% block content %}
 
+{% if available_months %}
+<form method="get" action="{{ url_for('reports') }}" class="card" style="padding:14px 16px; margin-bottom:16px; display:flex; flex-wrap:wrap; gap:12px; align-items:center;">
+  <label style="font-weight:700; font-size:13px;">Filtrar por mês</label>
+  <select name="month" onchange="this.form.submit()" style="padding:8px 12px; border:1px solid #E2E2E2; border-radius:8px; min-width:180px;">
+    <option value="">Todos os meses</option>
+    {% for m in available_months %}
+    <option value="{{ m }}" {% if m == selected_month %}selected{% endif %}>{{ month_label(m) }}</option>
+    {% endfor %}
+  </select>
+  {% if selected_month %}
+  <span class="text-gray font-sm">Mostrando relatórios de {{ month_label(selected_month) }}</span>
+  {% endif %}
+</form>
+{% endif %}
+
 {% if not individual and not diagnostics %}
 <div class="card" style="text-align:center; padding:48px;">
   <div style="font-size:40px; margin-bottom:12px;">◈</div>
-  <p class="text-gray" style="margin-bottom:16px;">Nenhum relatório gerado ainda.</p>
+  <p class="text-gray" style="margin-bottom:16px;">
+    {% if selected_month %}
+    Nenhum relatório gerado para {{ month_label(selected_month) }}.
+    {% else %}
+    Nenhum relatório gerado ainda.
+    {% endif %}
+  </p>
   <form method="post" action="{{ url_for('generate') }}">
+    {% if available_months %}
+    <input type="hidden" name="report_month" value="{{ selected_month or default_month }}">
+    {% endif %}
     <button type="submit" class="btn btn-primary">▶ Gerar relatórios</button>
   </form>
 </div>
@@ -29,17 +60,34 @@
   <table>
     <thead>
       <tr>
-        <th>Arquivo</th>
-        <th>Turma</th>
+        <th>Aluno</th>
+        <th>Mês</th>
+        <th>Evolução</th>
         <th></th>
       </tr>
     </thead>
     <tbody>
       {% for f in individual %}
-      {% set parts = f.stem.split('_') %}
+      {% set trend = report_trends.get(f.name) %}
+      {% set file_month = report_months.get(f.name) %}
       <tr>
         <td><strong>{{ f.stem.replace('_', ' ') }}</strong></td>
-        <td><span class="tag">{{ parts[0] }}</span></td>
+        <td>
+          {% if file_month %}
+          <span class="tag">{{ month_label(file_month) }}</span>
+          {% else %}
+          <span class="text-gray font-sm">—</span>
+          {% endif %}
+        </td>
+        <td>
+          {% if trend %}
+          <span class="trend-badge trend-{{ trend.direction }}" title="{% if trend.prior_score is not none %}Mês anterior: {{ trend.prior_score }} → atual: {{ trend.current_score }}{% endif %}">
+            {{ trend.symbol }} {{ trend.label }}
+          </span>
+          {% else %}
+          <span class="text-gray font-sm">—</span>
+          {% endif %}
+        </td>
         <td>
           <div class="report-actions">
             <a href="{{ url_for('preview', filename=f.name) }}" target="_blank" class="btn btn-ghost btn-xs">👁 Visualizar</a>
@@ -63,14 +111,22 @@
     <thead>
       <tr>
         <th>Turma</th>
+        <th>Mês</th>
         <th></th>
       </tr>
     </thead>
     <tbody>
       {% for f in diagnostics %}
-      {% set turma = f.stem.replace('_class_diagnostic', '') %}
+      {% set month = report_month_from_filename(f.name) %}
       <tr>
-        <td><strong><span class="tag" style="margin-right:8px;">{{ turma }}</span> Diagnóstico de turma</strong></td>
+        <td><strong>Diagnóstico de turma</strong></td>
+        <td>
+          {% if month %}
+          <span class="tag">{{ month_label(month) }}</span>
+          {% else %}
+          <span class="text-gray font-sm">—</span>
+          {% endif %}
+        </td>
         <td>
           <div class="report-actions">
             <a href="{{ url_for('preview', filename=f.name) }}" target="_blank" class="btn btn-ghost btn-xs">👁 Visualizar</a>
@@ -88,6 +144,20 @@
 {% endif %}
 
 {% endif %}
+
+<style>
+.trend-badge {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 999px;
+}
+.trend-improved { background: #E6F4EA; color: #1B7A3D; }
+.trend-declined { background: #FCE8E6; color: #B3261E; }
+.trend-stable { background: #F4F2F8; color: #5B2D8E; }
+.trend-first { background: #F4F2F8; color: #666; }
+</style>
 
 {% endblock %}
 

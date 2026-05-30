@@ -130,10 +130,11 @@ def test_generate_reports_writes_html_files(monkeypatch, tmp_path):
     response = client.post("/generate", follow_redirects=False)
 
     assert response.status_code == 302
-    assert response.headers["Location"].endswith("/reports")
+    assert "/reports" in response.headers["Location"]
+    assert "month=" in response.headers["Location"]
     generated = sorted(p.name for p in out_dir.glob("*.html"))
-    assert "MASTER_Jane_Doe_report.html" in generated
-    assert "MASTER_class_diagnostic.html" in generated
+    assert any(name.endswith("_report.html") for name in generated)
+    assert any("class_diagnostic" in name for name in generated)
 
 
 def test_generate_missing_csv_shows_upload_error(monkeypatch, tmp_path):

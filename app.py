@@ -25,6 +25,7 @@ from auth import (ROLE_ADMIN, ROLE_LABELS, ROLE_SUPERADMIN, ROLE_TEACHER,
                   find_lesson_global_index, find_student_global_index,
                   has_full_data_access, normalize_teacher_name, teacher_turmas,
                   user_public_dict)
+from csv_import import parse_upload_csv
 from extra_sessions import (EXTRA_SESSION_FIELD_LABELS, EXTRA_SESSION_FIELDS,
                             build_atendimentos_template_csv,
                             SESSION_TYPE_CHOICES, coerce_session_status_fields,
@@ -768,6 +769,15 @@ def _csv_rows_from_text(text):
     return rows
 
 
+def _rows_to_csv_text(key, rows):
+    fields = STUDENT_FIELDS if key == 'students' else LESSON_FIELDS
+    buf = io.StringIO()
+    writer = csv.DictWriter(buf, fieldnames=fields, extrasaction='ignore')
+    writer.writeheader()
+    writer.writerows(rows)
+    return buf.getvalue()
+
+
 def _queue_upload_notice(message=None, error=None):
     if message:
         messages = list(session.get('upload_messages', []))
@@ -957,6 +967,7 @@ def dashboard():
         lessons_path = DATA_DIR / 'lessons.csv'
         data_ready = (DATA_DIR / 'students.csv').exists() and lessons_path.exists()
     db_status = _database_status()
+    generate_error = session.pop('generate_error', None)
     return render_template('dashboard.html',
         student_count=len(students),
         turma_count=len(turmas),
@@ -967,6 +978,7 @@ def dashboard():
         db_status=db_status,
         available_months=available_report_months(lessons),
         default_month=default_report_month(lessons),
+        generate_error=generate_error,
     )
 
 
@@ -1322,12 +1334,21 @@ def upload():
                     errors.append(f'Erro no CSV de {label}: {decode_error}')
                     continue
 
-                validation_errors = _validate_csv(key, text)
+                rows, convert_note, parse_errors = parse_upload_csv(
+                    key,
+                    text,
+                    user=user,
+                    source_filename=f.filename,
+                )
+                if parse_errors:
+                    errors.append(f'Erro no CSV de {label}: {parse_errors[0]}')
+                    continue
+
+                validation_errors = _validate_csv(key, _rows_to_csv_text(key, rows))
                 if validation_errors:
                     errors.append(f'Erro no CSV de {label}: {validation_errors[0]}')
                     continue
 
-                rows = _csv_rows_from_text(text)
                 if not has_full_data_access(user['role']):
                     if key == 'students':
                         validation_errors = _validate_teacher_student_rows(rows, user)
@@ -1343,7 +1364,10 @@ def upload():
                     _save_upload_dataset(key, rows, user, students_after_upload)
                     if key == 'students':
                         students_after_upload = _load_students()
-                    messages.append(f'{label} carregado: {f.filename}')
+                    success = f'{label} carregado: {f.filename}'
+                    if convert_note:
+                        success = f'{success} ({convert_note})'
+                    messages.append(success)
                 except OSError as exc:
                     errors.append(f'Erro ao salvar {label}: {exc}')
     return render_template('upload.html', **_upload_page_context(user, messages, errors))
@@ -1471,9 +1495,29 @@ def _run_report_generation(students, lessons, report_month):
         students, lessons, env, OUT_DIR,
         report_month=report_month, snapshots=snapshots,
     )
-    upsert_month_snapshots(
-        SNAPSHOTS_PATH, report_month, students, lessons, build_student_ctx,
-    )
+    try:
+        upsert_month_snapshots(
+            SNAPSHOTS_PATH, report_month, students, lessons, build_student_ctx,
+        )
+    except OSError as exc:
+        logger.warning('Could not save monthly snapshots to %s: %s', SNAPSHOTS_PATH, exc)
+
+
+def _trend_for_report_file(path, month, students, lessons, snapshots):
+    if not month:
+        return None
+    for student in students:
+        turma = student.get('turma', '').strip()
+        name = student.get('student_name', '').strip()
+        if not turma or not name:
+            continue
+        if individual_report_filename(turma, name, month) != path.name:
+            if individual_report_filename(turma, name) != path.name:
+                continue
+        ctx = build_student_ctx(student, lessons, report_month=month)
+        composite = student_composite_score(ctx)
+        return compute_month_trend(composite, month, snapshots, turma, name)
+    return None
 
 
 @app.route('/generate', methods=['POST'])
@@ -1487,10 +1531,7 @@ def generate():
     if db_store:
         if not students or not lessons:
             return redirect(url_for('upload' if has_full_data_access(user['role']) else 'dashboard'))
-        _run_report_generation(students, lessons, report_month)
-        return redirect(url_for('reports', month=report_month))
-
-    if has_full_data_access(user['role']):
+    elif has_full_data_access(user['role']):
         students_file = DATA_DIR / 'students.csv'
         lessons_file = DATA_DIR / 'lessons.csv'
         missing = []
@@ -1518,7 +1559,16 @@ def generate():
                 **_upload_page_context(user, errors=errors),
             )
 
-    _run_report_generation(students, lessons, report_month)
+    try:
+        _run_report_generation(students, lessons, report_month)
+    except Exception as exc:
+        logger.exception('Report generation failed for month %s: %s', report_month, exc)
+        session['generate_error'] = (
+            'Não foi possível gerar os relatórios. Verifique os dados de alunos e aulas '
+            'e tente novamente. Se o problema continuar, contate o suporte.'
+        )
+        return redirect(url_for('dashboard'))
+
     return redirect(url_for('reports', month=report_month))
 
 
@@ -1596,28 +1646,20 @@ def reports():
     diagnostics = [f for f in files if 'class_diagnostic' in f.name]
 
     snapshots = load_snapshots(SNAPSHOTS_PATH)
-    individual_rows = []
+    report_trends = {}
+    report_months = {}
     for path in individual:
         month = report_month_from_filename(path.name) or selected_month
-        trend = None
-        for student in students:
-            turma = student.get('turma', '').strip()
-            name = student.get('student_name', '').strip()
-            if not turma or not name:
-                continue
-            if individual_report_filename(turma, name, month) != path.name:
-                if individual_report_filename(turma, name) != path.name:
-                    continue
-            if month:
-                ctx = build_student_ctx(student, lessons, report_month=month)
-                composite = student_composite_score(ctx)
-                trend = compute_month_trend(composite, month, snapshots, turma, name)
-            break
-        individual_rows.append(dict(path=path, trend=trend, report_month=month))
+        report_months[path.name] = month
+        trend = _trend_for_report_file(path, month, students, lessons, snapshots)
+        if trend:
+            report_trends[path.name] = trend
 
     return render_template(
         'reports.html',
-        individual=individual_rows,
+        individual=individual,
+        report_trends=report_trends,
+        report_months=report_months,
         diagnostics=diagnostics,
         available_months=available_months,
         selected_month=selected_month,

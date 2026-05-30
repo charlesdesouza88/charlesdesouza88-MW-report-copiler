@@ -99,6 +99,30 @@ def test_build_student_ctx_computes_expected_derived_values():
     assert len(ctx["missed"]) == 1
 
 
+def test_build_student_ctx_month_scopes_presence():
+    lessons = [
+        {
+            "turma": "MASTER",
+            "aula_num": "1",
+            "date": "01/02/2026",
+            "licao_conteudo": "L1",
+            "atividade_extra": "",
+            "habilidades": "",
+        },
+        {
+            "turma": "MASTER",
+            "aula_num": "2",
+            "date": "01/03/2026",
+            "licao_conteudo": "L2",
+            "atividade_extra": "",
+            "habilidades": "",
+        },
+    ]
+    ctx = build_student_ctx(_student(faltas="1", missed_aulas="2"), lessons, report_month="2026-03")
+    assert ctx["pct"] == 0
+    assert len(ctx["missed"]) == 1
+
+
 def test_needs_extra_accepts_accented_and_unaccented_values():
     assert needs_extra(_student(aula_extra="Reforco")) is True
     assert needs_extra(_student(aula_extra="Reposicao")) is True

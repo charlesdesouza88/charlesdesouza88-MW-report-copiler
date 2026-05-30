@@ -4,13 +4,26 @@
 
 {% block topbar_actions %}
   {% if data_ready %}
-  <form method="post" action="{{ url_for('generate') }}">
+  <form method="post" action="{{ url_for('generate') }}" style="display:inline-flex; gap:8px; align-items:center;">
+    {% if available_months %}
+    <select name="report_month" style="padding:6px 10px; border-radius:8px; border:1px solid #E2E2E2;">
+      {% for m in available_months %}
+      <option value="{{ m }}" {% if m == default_month %}selected{% endif %}>{{ month_label(m) }}</option>
+      {% endfor %}
+    </select>
+    {% endif %}
     <button type="submit" class="btn btn-primary">▶ Gerar Relatórios</button>
   </form>
   {% endif %}
 {% endblock %}
 
 {% block content %}
+
+{% if generate_error %}
+<div class="alert alert-warning" style="margin-bottom:16px;">
+  ⚠ {{ generate_error }}
+</div>
+{% endif %}
 
 {% if db_status.configured %}
 <div class="alert {% if db_status.connected %}alert-success{% else %}alert-warning{% endif %}" style="margin-bottom:16px;">
@@ -64,6 +77,14 @@
       <a href="{{ url_for('lessons') }}" class="btn btn-outline" style="justify-content:center;">▤ &nbsp;Detalhes das aulas</a>
       {% if data_ready %}
       <form method="post" action="{{ url_for('generate') }}">
+        {% if available_months %}
+        <label class="font-sm text-gray" style="display:block; margin-bottom:6px;">Mês do relatório</label>
+        <select name="report_month" style="width:100%; padding:8px 12px; border:1px solid #E2E2E2; border-radius:8px; margin-bottom:10px;">
+          {% for m in available_months %}
+          <option value="{{ m }}" {% if m == default_month %}selected{% endif %}>{{ month_label(m) }}</option>
+          {% endfor %}
+        </select>
+        {% endif %}
         <button type="submit" class="btn btn-primary" style="width:100%; justify-content:center;">▶ &nbsp;Gerar todos os relatórios</button>
       </form>
       {% endif %}

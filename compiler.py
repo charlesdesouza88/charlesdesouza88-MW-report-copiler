@@ -309,19 +309,24 @@ def generate_individual_reports(students, lessons, env, out_dir, report_month=No
     tpl = env.get_template("individual_report.html")
     snapshots = snapshots or {}
     for s in students:
+        turma = (s.get('turma') or '').strip()
+        student_name = (s.get('student_name') or '').strip()
+        if not turma or not student_name:
+            print(f"  ⚠ skipping student row missing turma/name: {s!r}")
+            continue
         trend = None
         if report_month:
             base_ctx = build_student_ctx(s, lessons, report_month=report_month)
             composite = student_composite_score(base_ctx)
             trend = compute_month_trend(
                 composite, report_month, snapshots,
-                s.get('turma', ''), s.get('student_name', ''),
+                turma, student_name,
             )
         ctx = build_student_ctx(s, lessons, report_month=report_month, trend=trend)
         if report_month:
             ctx['report_month_label'] = month_label(report_month)
         html = tpl.render(**ctx)
-        fname = student_report_filename(s['turma'], s['student_name'], report_month)
+        fname = student_report_filename(turma, student_name, report_month)
         safe_child_path(out_dir, fname).write_text(html, encoding="utf-8")
         print(f"  ✓ {fname}")
 
